@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Skill",
+      "Bash(python tools/extract.py:*)",
+      "Bash(python tools/srs.py:*)",
+      "Bash(python tools/render.py:*)"
+    ],
+    "deny": [
+      "PowerShell"
+    ]
+  }
+}

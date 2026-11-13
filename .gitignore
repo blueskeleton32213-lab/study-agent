@@ -1,0 +1,19 @@
+# ── 올리지 않는 것 ──
+# 강의자료와 그걸 옮긴 텍스트 (저작권, 개인 과제 포함)
+materials/
+texts/
+# 스튜디오에서 만든 정리 자료 (강의자료에서 파생)
+studio/
+# 개인 공부 기록: 복습 카드, 대화 기록, 시험 스타일, 과목 순서
+data/
+# 임시 파일·지운 과목
+cache/
+휴지통/
+
+# Python
+__pycache__/
+*.pyc
+*.tmp
+
+# Claude Code 개인 설정
+.claude/settings.local.json
