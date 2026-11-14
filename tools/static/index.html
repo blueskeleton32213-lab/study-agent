@@ -180,6 +180,22 @@ header { display: flex; align-items: center; gap: 4px; height: 58px; padding: 0 
 .bubble.md th { font-weight: 600; color: var(--muted); font-size: 13px; border-bottom-color: var(--rule-strong); }
 .bubble.md h1, .bubble.md h2, .bubble.md h3 { font-size: 1.05em; margin: 1.3em 0 .5em; }
 .bubble.md hr { border: 0; border-top: 1px solid var(--rule); margin: 1.4em 0; }
+/* 그림: 원본 쪽 이미지(.pg)와 mermaid 다이어그램(.mmd) */
+.fig { margin: 1em 0 1.1em; max-width: 100%; }
+.fig.pg a.fig-open { display: block; width: fit-content; max-width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--rule-strong); background: #fff; cursor: zoom-in; }
+.fig.pg img { display: block; max-width: min(100%, 640px); max-height: 460px; object-fit: contain; }
+.fig.pg a.fig-open:hover { box-shadow: 0 0 0 2px var(--hl-strong); }
+.fig figcaption { margin-top: 6px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.fig .fig-cap { color: var(--ink-2); }
+.fig.pg.broken a.fig-open { display: none; }
+.fig.pg.broken figcaption::before { content: "원본 쪽을 불러오지 못했어요 —"; color: var(--amber); }
+.fig.mmd { padding: 14px 12px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); overflow-x: auto; text-align: center; }
+.fig.mmd svg { max-width: 100%; height: auto; }
+.fig.mmd.pending, .fig.mmd.wait { min-height: 56px; display: grid; place-items: center; color: var(--muted); }
+.fig.mmd .node.key rect, .fig.mmd .node.key polygon, .fig.mmd .node.key circle, .fig.mmd .node.key path { fill: var(--pen-soft) !important; stroke: var(--pen) !important; stroke-width: 2px !important; }
+.fig.mmd .node.info rect, .fig.mmd .node.info polygon, .fig.mmd .node.info circle, .fig.mmd .node.info path { fill: var(--hl-soft) !important; stroke: var(--hl) !important; }
+.fig.mmd .mmd-err { font-size: 13px; color: var(--amber); text-align: left; margin-bottom: 6px; }
+.fig.mmd pre { text-align: left; }
 .katex { font-size: 1.06em; }
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 6px 0; margin: .6em 0; }
 .tools { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 10px; }
@@ -972,10 +988,13 @@ const meta = parts => `<span class="meta">${parts.filter(Boolean).map(p => `<spa
 function md(text) {
   if (window.marked && window.DOMPurify) {
     // 수식($$...$$, $...$, \[...\], \(...\))은 마크다운 처리 전에 빼두었다가 KaTeX로 그려서 다시 넣는다
+    // 그림: ```mermaid 블록 → 다이어그램, [[원본: 파일.pdf p.N | 설명]] → 원본 쪽 이미지 (figure 스킬 참고)
     const math = [];
     const keep = (tex, display) => { math.push([tex, display]); return `@@MATH${math.length - 1}@@`; };
     let src = text
+      .replace(/```mermaid(?![\s\S]*```)[\s\S]*$/, () => keep("", "mmd-wait"))  // 아직 받는 중인(닫히지 않은) 다이어그램
       .replace(/```[\s\S]*?```|`[^`\n]*`/g, m => keep(m, null))
+      .replace(PAGE_FIG_RE, (_, name, page, cap) => keep({ name: name.trim(), page, cap: (cap || "").trim() }, "page"))
       .replace(/\$\$([\s\S]+?)\$\$/g, (_, t) => keep(t, true))
       .replace(/\\\[([\s\S]+?)\\\]/g, (_, t) => keep(t, true))
       .replace(/\\\(([\s\S]+?)\\\)/g, (_, t) => keep(t, false))
@@ -987,12 +1006,93 @@ function md(text) {
     let html = DOMPurify.sanitize(marked.parse(src, { breaks: true }));
     return linkCites(html.replace(/@@MATH(\d+)@@/g, (_, i) => {
       const [tex, display] = math[+i];
+      if (display === "page") return pageFig(tex);
+      if (display === "mmd-wait") return '<div class="fig mmd wait"><span class="typing">그림 그리는 중</span></div>';
+      if (display === null && /^```mermaid\s*\n/.test(tex)) return mermaidFig(tex.replace(/^```mermaid\s*\n/, "").replace(/```$/, "").trim());
       if (display === null) return DOMPurify.sanitize(tex.startsWith("```") ? marked.parse(tex) : marked.parseInline(tex));
       if (!window.katex) { const d = document.createElement("span"); d.textContent = display ? `$$${tex}$$` : `$${tex}$`; return d.innerHTML; }
       return katex.renderToString(tex, { displayMode: display, throwOnError: false, trust: false });
     }));
   }
   const d = document.createElement("div"); d.textContent = text; return linkCites(d.innerHTML.replace(/\n/g, "<br>"));
+}
+
+/* ── 그림 ── */
+const attr = s => esc(s).replace(/"/g, "&quot;");
+const PAGE_FIG_RE = /\[\[\s*원본\s*[:：]\s*([^\]|\n]+?\.pdf)\s*,?\s*(?:pp?\.?|쪽)?\s*(\d+)\s*쪽?\s*(?:\|\s*([^\]\n]*?))?\s*\]\]/gi;
+// 원본 PDF 쪽 그림: 누르면 오른쪽 원본 창에서 크게 연다
+function pageFig({ name, page, cap }) {
+  const q = `name=${encodeURIComponent(name)}&page=${page}${current ? `&subject=${encodeURIComponent(current)}` : ""}`;
+  return `<figure class="fig pg"><a class="fig-open" href="#" data-name="${attr(name)}" data-page="${page}" title="눌러서 원본 크게 보기">` +
+    `<img src="/api/pageimg?${q}" alt="${attr(name)} p.${page}" loading="lazy"></a>` +
+    `<figcaption>${cap ? `<span class="fig-cap">${esc(cap)}</span>` : ""}<span class="fig-src">원본 · ${esc(name)} p.${page}</span></figcaption></figure>`;
+}
+document.addEventListener("error", e => {  // 없는 쪽·PDF 아닌 자료 → 그림 자리를 안내 문구로
+  if (e.target.matches?.(".fig.pg img")) e.target.closest(".fig").classList.add("broken");
+}, true);
+
+// mermaid 다이어그램: 처음 필요할 때 라이브러리를 불러오고, 그린 결과는 원문별로 기억한다
+// (답변이 흘러들어오는 동안 md()가 계속 다시 그려도 깜빡이지 않게)
+const mmdCache = new Map();
+let mmdLib = null, mmdSeq = 0;
+function mermaidFig(code) {
+  const hit = mmdCache.get(code);
+  if (hit) return `<div class="fig mmd" data-src="${attr(code)}">${hit}</div>`;
+  return `<div class="fig mmd pending" data-src="${attr(code)}"><span class="typing">그림 그리는 중</span></div>`;
+}
+function loadMermaid() {
+  return mmdLib ||= new Promise((ok, fail) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js";
+    s.onload = () => ok(window.mermaid); s.onerror = () => { mmdLib = null; fail(new Error("mermaid를 불러오지 못했어요")); };
+    document.head.append(s);
+  });
+}
+function mermaidTheme() {
+  const v = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  return {
+    startOnLoad: false, securityLevel: "strict", theme: "base",
+    flowchart: { htmlLabels: true, curve: "basis", padding: 12 }, sequence: { useMaxWidth: true },
+    themeVariables: {
+      fontFamily: v("--sans"), fontSize: "15px", darkMode: document.documentElement.dataset.theme !== "day",
+      background: v("--surface"), primaryColor: v("--raised"), primaryTextColor: v("--ink"), primaryBorderColor: v("--rule-strong"),
+      secondaryColor: v("--sunk"), tertiaryColor: v("--surface"), lineColor: v("--muted"), textColor: v("--ink"),
+      clusterBkg: v("--sunk"), clusterBorder: v("--rule-strong"), edgeLabelBackground: v("--surface"),
+      noteBkgColor: v("--amber-soft"), noteTextColor: v("--ink"), noteBorderColor: v("--amber"),
+      actorBkg: v("--raised"), actorBorder: v("--rule-strong"), actorTextColor: v("--ink"), signalColor: v("--ink-2"), signalTextColor: v("--ink"),
+    },
+  };
+}
+let mmdBusy = false;
+async function paintMermaid() {
+  if (mmdBusy) return; mmdBusy = true;
+  try {
+    let el;
+    while ((el = document.querySelector(".fig.mmd.pending"))) {
+      const code = el.dataset.src;
+      let svg = mmdCache.get(code);
+      if (!svg) {
+        try {
+          const m = await loadMermaid(); m.initialize(mermaidTheme());
+          const id = `mmd${++mmdSeq}`;
+          try { svg = (await m.render(id, code)).svg; }
+          finally { document.getElementById(id)?.remove(); document.getElementById(`d${id}`)?.remove(); }
+        } catch (e) {
+          svg = `<div class="mmd-err">그림을 그리지 못했어요 — 원문을 보여줄게요</div><pre><code>${esc(code)}</code></pre>`;
+          if (/불러오지/.test(e.message)) { document.querySelectorAll(".fig.mmd.pending").forEach(x => { x.classList.remove("pending"); x.innerHTML = svg; }); break; }
+        }
+        mmdCache.set(code, svg);
+      }
+      document.querySelectorAll(".fig.mmd.pending").forEach(x => { if (x.dataset.src === code) { x.classList.remove("pending"); x.innerHTML = svg; } });
+    }
+  } finally { mmdBusy = false; }
+}
+new MutationObserver(() => { if (document.querySelector(".fig.mmd.pending")) paintMermaid(); })
+  .observe(document.body, { childList: true, subtree: true });
+function repaintMermaid() {  // 낮/밤 바꾸면 색을 다시 입힌다
+  mmdCache.clear();
+  document.querySelectorAll(".fig.mmd[data-src]").forEach(x => { x.classList.add("pending"); });
+  paintMermaid();
 }
 
 /* ── 출처 링크: 실제 자료 파일명과 일치하는 것만 링크로 ── */
@@ -1022,7 +1122,7 @@ function linkCites(html) {
   if (!citeRe || !html) return html;
   const tpl = document.createElement("template"); tpl.innerHTML = html;
   const walker = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT, {
-    acceptNode: n => n.parentElement?.closest("code, pre, a, .katex, .cite") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    acceptNode: n => n.parentElement?.closest("code, pre, a, .katex, .cite, .fig") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
   });
   const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
   let last = null;
@@ -1263,6 +1363,7 @@ applySide(store.get("sideCollapsed", false));
 
 function applyTheme(t) {
   document.documentElement.dataset.theme = t; store.set("theme", t);
+  if (mmdCache.size) repaintMermaid();
   for (const b of [$("#themeBtn"), $("#themeBtnM")]) {
     b.innerHTML = icon(t === "night" ? "sun" : "moon");
     b.title = t === "night" ? "낮 모드로 바꾸기" : "밤 모드로 바꾸기";
@@ -1429,7 +1530,7 @@ async function send(message, shown) {
   if (st) closeStudio();
   if (hv) closeHistory();
   if (!history.length) $("#msgs").innerHTML = "";
-  history.push({ role: "user", text: shown ?? message }); bubble("user", shown ?? message);
+  history.push({ role: "user", text: shown ?? message, ...(current ? { subj: current } : {}) }); bubble("user", shown ?? message);
   const wantCites = CITE_ASK_RE.test(shown ?? message);
   const holder = document.createElement("div"); holder.className = "msg bot" + (wantCites ? " cites-on" : "");
   const inner = document.createElement("div"); inner.className = "bubble md";
@@ -2660,9 +2761,29 @@ input.addEventListener("input", () => { input.style.height = "auto"; input.style
 input.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
 });
-function submit() {
+// 토큰 절약: 이어서 물으면 지금까지의 대화가 매번 통째로 다시 들어간다.
+// 과목이 바뀌었거나 대화가 길어지면 보내기 전에 새 대화를 권한다 ("이어서 묻기"를 고르면 그 대화에선 10번 뒤에 다시)
+const LONG_CHAT = 10;
+let nudge = { sid: null, at: LONG_CHAT, subj: null };
+async function suggestNewChat() {
+  if (!sessionId || !current) return true;
+  if (nudge.sid !== sessionId) nudge = { sid: sessionId, at: LONG_CHAT, subj: null };
+  const users = history.filter(h => h.role === "user");
+  const prevSubj = [...users].reverse().find(h => h.subj)?.subj;
+  const reason = prevSubj && prevSubj !== current && nudge.subj !== current ? `과목이 바뀌었어요 (${prevSubj} → ${current}).`
+    : users.length >= nudge.at ? `한 대화에서 ${users.length}번 물었어요.` : "";
+  if (!reason) return true;
+  const r = await ask({ title: "새 대화로 시작할까요?", ok: "새 대화로", cancel: "이어서 묻기",
+    desc: `${reason} 이어서 물으면 앞의 대화와 읽은 자료가 매번 다시 들어가서 토큰을 많이 써요. 지금 대화는 대화 기록에 그대로 남아요.` });
+  if (r === null) return false;  // Esc: 보내지 않고 입력한 글은 그대로
+  if (r) { history = []; sessionId = null; chatId = null; store.set("history", []); store.set("session", null); store.set("chatId", null); renderHistory(); }
+  else { nudge.at = users.length + LONG_CHAT; nudge.subj = current; }
+  return true;
+}
+async function submit() {
   if (busy) return;
   const v = input.value.trim(); if (!v) return;
+  if (!v.startsWith("/") && !(await suggestNewChat())) return;
   input.value = ""; input.style.height = "auto";
   if (!v.startsWith("/") && ICLASS_RE.test(v)) {  // 말한 과목이 있으면 그 과목만, 없으면 전부
     const named = state.subjects.map(s => s.name).filter(n => v.includes(n));
@@ -2675,7 +2796,7 @@ $("#sendBtn").onclick = () => busy ? api("/api/stop", { method: "POST", body: JS
 
 setInterval(() => api("/api/ping").catch(() => {}), 30000);
 document.addEventListener("click", e => {
-  const a = e.target.closest("a.cite"); if (!a) return;
+  const a = e.target.closest("a.cite, a.fig-open"); if (!a) return;
   e.preventDefault();
   if (document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) document.activeElement.blur(); // 바로 ←/→로 넘길 수 있게
   document.querySelectorAll("a.cite.on").forEach(x => x.classList.remove("on")); a.classList.add("on");

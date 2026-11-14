@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import sys
 import threading
 import time
@@ -37,6 +38,21 @@ CLAUDE = shutil.which("claude") or str(Path.home() / ".local" / "bin" / "claude.
 PYTHON = sys.executable.replace("pythonw.exe", "python.exe")
 # 앱이 띄우는 Claude 표시: 작업 기록 Stop 훅(.claude/hooks/worklog_check.py)이 공부 대화에선 끼어들지 않게
 CLAUDE_ENV = {**os.environ, "STUDY_APP": "1"}
+import usage  # noqa: E402  기능별 사용량 기록 (data/usage.jsonl, 요약은 python tools/usage.py)
+
+# ── 토큰 절약 ──
+# 앱이 띄우는 Claude에는 튜터에 필요한 도구만 주고, 개인 커넥터(MCP)·개인 스킬은 싣지 않는다.
+# (측정: 같은 질문 하나에 입력 약 27,000 → 15,600 토큰)
+CLAUDE_TOOLS = "Read,Grep,Glob,Bash,Skill"
+# 일마다 모델: None = 기본 모델(품질이 중요한 출제·정리), 질문은 sonnet, 단순한 채점은 haiku
+MODELS = {"chat": "sonnet", "ask": "sonnet", "quiz": None, "studio": None, "grade": "haiku"}
+
+
+def claude_cmd(kind: str, tools: str = CLAUDE_TOOLS) -> list[str]:
+    cmd = [CLAUDE, "-p", "--strict-mcp-config", "--setting-sources", "project,local", "--tools", tools]
+    if MODELS.get(kind):
+        cmd += ["--model", MODELS[kind]]
+    return cmd
 
 def code_version() -> float:
     """서버 코드(tools/*.py)의 최신 수정 시각. 실행 중에 코드가 바뀌면 launch.pyw가 서버를 교체한다."""
@@ -362,6 +378,8 @@ def tool_label(name: str, inp: dict) -> str:
             return "자료 텍스트 추출"
         if "render.py" in cmd:
             return "원본 쪽 그림으로 확인"
+        if "digest.py" in cmd:
+            return "요약본 읽는 중 (처음이면 만드는 중)"
         return "명령 실행"
     if name == "Skill":
         return f"스킬 실행: {inp.get('skill', '')}"
@@ -371,9 +389,11 @@ def tool_label(name: str, inp: dict) -> str:
 
 
 def stream_claude(message: str, session_id: str | None, send, extra: list[str] | None = None,
-                  on_result=None, slot: str = "chat") -> None:
-    """claude -p 를 실행하며 이벤트를 send로 흘려보낸다. on_result가 있으면 result 이벤트를 넘겨준다."""
-    cmd = [CLAUDE, "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", *(extra or [])]
+                  on_result=None, slot: str = "chat", kind: str | None = None) -> None:
+    """claude -p 를 실행하며 이벤트를 send로 흘려보낸다. on_result가 있으면 result 이벤트를 넘겨준다.
+    kind: 사용량 기록·모델 선택용 이름 (없으면 slot)"""
+    kind = kind or slot
+    cmd = [*claude_cmd(kind), "--output-format", "stream-json", "--verbose", "--include-partial-messages", *(extra or [])]
     if session_id:
         cmd += ["--resume", session_id]
     proc = subprocess.Popen(cmd, cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -420,6 +440,7 @@ def stream_claude(message: str, session_id: str | None, send, extra: list[str] |
                     send({"type": "tool", "label": tool_label(tu["name"], inp)})
             elif t == "result":
                 got_result = True
+                usage.log(kind, ev)
                 if on_result:
                     on_result(ev)
                 if ev.get("is_error"):
@@ -564,7 +585,8 @@ def quiz_prompt(subject: str, scope: str, n: int, level: str, qtype: str, guide:
 과목: {subject} / 범위: {scope or "전체"} / 문제 수: {n} / 난이도: {level} ({LEVELS.get(level, LEVELS["보통"])}) / 유형: {"시험 스타일을 따름" if (guide or note) and qtype == "mix" else QTYPES.get(qtype, QTYPES["mix"])}{style_block}
 
 출제 규칙:
-1. `texts/{subject}/`에서 범위에 해당하는 파일을 읽고 **그 내용에서만** 출제한다. 범위가 "전체"면 강의 전반에 고르게.
+1. 범위에 해당하는 강의자료 내용에서만 출제한다. 범위가 "전체"면 강의 전반에 고르게.
+   읽는 순서(토큰 절약): `cache/목차/{subject}.md`로 파일을 고르고 → `python tools/digest.py "texts/{subject}/A.md" ...`(여러 개 한 번에, Bash timeout 600000)로 요약본을 받아 출제할 개념을 정한 뒤 → 문제로 낼 부분만 원문 texts에서 그 쪽만 Read(offset/limit)로 확인한다. 원문 파일 통째로 Read 금지 (digest.py가 거부되면 목차로 고른 쪽만 읽는다).
 2. `python tools/srs.py stats {subject}`의 자주틀린주제가 범위 안에 있으면 1~2문제는 그 주제로.
 3. 파일명에 solution·해설·답안·모의고사·문제지가 있는 자료는 출제 스타일과 자주 나오는 유형을 참고만 하고, 문제를 그대로 베끼지 않는다.
 4. 수식은 LaTeX(`$...$`). `(🖼 ...)` 표시가 있는 쪽의 수식이 필요하면 render.py로 원본을 확인한다. 추측으로 수식을 만들지 않는다.
@@ -603,11 +625,13 @@ def grade_answer(q: dict, user_answer: str) -> dict:
 feedback: 존댓말 2~3문장. 학생 답에서 맞은 점과 틀린/빠진 점을 짚는다. 수식은 LaTeX($...$).
 확인 질문, 복습 카드 저장 제안, "자료를 확인하지 않았다" 같은 말은 쓰지 않는다.
 missing: 학생 답에 빠진 핵심 키워드 (없으면 빈 배열)."""
-    r = subprocess.run([CLAUDE, "-p", "--tools", "", "--output-format", "json", "--json-schema", json.dumps(GRADE_SCHEMA)],
-                       cwd=ROOT, input=prompt.encode("utf-8"), capture_output=True, creationflags=NO_WINDOW, timeout=180,
-                       env=CLAUDE_ENV)
+    # 채점은 문제·답만 보면 되니 도구 없이, CLAUDE.md도 안 읽히게 프로젝트 밖(임시 폴더)에서 실행
+    r = subprocess.run([*claude_cmd("grade", tools=""), "--output-format", "json", "--json-schema", json.dumps(GRADE_SCHEMA)],
+                       cwd=tempfile.gettempdir(), input=prompt.encode("utf-8"), capture_output=True, creationflags=NO_WINDOW,
+                       timeout=180, env=CLAUDE_ENV)
     try:
         data = json.loads(r.stdout.decode("utf-8", errors="replace"))
+        usage.log("grade", data)
         res = data.get("structured_output")
         if not res:
             raise ValueError(data.get("result") or "채점 결과가 비어 있어요")
@@ -635,7 +659,7 @@ STUDIO_TYPES = {
 - 공식 사이의 관계(예: A에서 B 유도)가 중요하면 표 아래에 한두 줄로.
 - 마지막에 `## 헷갈리기 쉬운 공식` (비슷하게 생긴 공식 비교)."""),
     "patterns": ("기출 유형 분석", """**출제 유형 분석**을 만든다.
-- 근거 자료: 파일명에 solution·해설·답안·모의고사·문제지·기출·퀴즈가 있는 파일. 모두 읽는다.
+- 근거 자료: 파일명에 solution·해설·답안·모의고사·문제지·기출·퀴즈가 있는 파일. 이 시험 자료는 문제 형식이 중요하니 요약본 대신 원문을 읽는다 (강의자료 쪽은 요약본으로 충분).
 - `## 유형별 정리` 표: `| 유형 | 나온 횟수 | 대표 문제(요약) | 관련 강의 | 출처 |`
 - `## 자주 나오는 함정`: 오답을 유도하는 포인트와 피하는 법.
 - `## 배점·난이도 경향` (자료에 있을 때만).
@@ -659,9 +683,11 @@ def studio_prompt(subject: str, kind: str, scope: str, custom: str) -> str:
 {task}
 
 공통 규칙:
-- `texts/{subject}/`에서 범위에 해당하는 파일을 **빠짐없이** 읽고, 그 내용만으로 만든다. 자료에 없는 내용은 넣지 않는다 (꼭 필요하면 "(강의자료 외 보충)" 표시).
+- **토큰 절약 — 읽는 순서:** ① `cache/목차/{subject}.md`로 범위에 맞는 파일·쪽을 고른다 → ② 그 파일들의 요약본을 `python tools/digest.py "texts/{subject}/A.md" "texts/{subject}/B.md"`로 한 번에 받는다 (Bash timeout 600000. 처음엔 만드느라 걸리고 다음부턴 바로 나온다) → ③ 요약본으로 부족한 곳(수식 원문, 정확한 정의·표·예제)만 원문 texts를 **그 쪽만** Read(offset/limit)로 읽는다. 원문 파일을 통째로 Read하지 않는다. (digest.py 실행이 거부되면 요약본 없이 ①의 쪽만 골라 읽는다)
+- 범위에 해당하는 파일은 빠짐없이 다루고, 자료 내용만으로 만든다. 자료에 없는 내용은 넣지 않는다 (꼭 필요하면 "(강의자료 외 보충)" 표시).
 - 핵심 문장·표의 행마다 출처를 단다. 형식: `(Lecture05_TFIDF_Part1.pdf p.12)`, `(보고서.docx part 4)`, `(2강.pptx slide 3)`.
 - 수식은 LaTeX(`$...$`, 따로 보일 식은 `$$...$$`).
+- 그림: `.claude/skills/figure/SKILL.md`를 먼저 Read하고 그 기준을 따른다. 절마다 핵심 개념이 구조·흐름·그래프·회로처럼 글로는 머릿속에 그려야 하는 것일 때만 넣는다 (원본 쪽 `[[원본: 파일.pdf p.N | 설명]]` 우선, 없으면 mermaid). 문서 전체에 많아야 절당 1개.
 - markdown은 바로 인쇄해도 될 완성본으로: 맨 위에 `#` 제목 없이 `##`부터 시작. 인사말, "확인할게요" 같은 진행 멘트, 확인 질문, 카드 저장 제안은 쓰지 않는다.
 - title: 짧게, 예) "{subject} 시험대비 요약 ({scope or "전체"})"."""
 
@@ -919,10 +945,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"markdown": text.split("\n---\n", 1)[-1]})
             except (ValueError, KeyError) as exc:
                 self._json({"error": str(exc)}, 404)
-        elif path in ("/api/source", "/api/page", "/api/section"):
+        elif path in ("/api/source", "/api/page", "/api/section", "/api/pageimg"):
             q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
             try:
-                if path == "/api/source":
+                if path == "/api/pageimg":  # 답변 속 [[원본: 파일.pdf p.N]] 그림: 파일명으로 찾아서 그 쪽 이미지
+                    src = find_source(q["name"], q.get("subject"))
+                    if src is None or src.suffix.lower() != ".pdf":
+                        raise ValueError(f"PDF 자료가 아니에요: {q['name']}")
+                    q["path"] = src.relative_to(MATERIALS).as_posix()
+                elif path == "/api/source":
                     return self._json(source_info(q["name"], q.get("subject")))
                 if path == "/api/section":
                     secs = text_sections(material_path(q["path"]))
@@ -1184,7 +1215,7 @@ class Handler(BaseHTTPRequestHandler):
                     send({"type": "tool", "label": f"시험 스타일 분석 중 (자료 {len(info['files'])}개, 처음 한 번)"})
                     sres = {}
                     stream_claude(style_prompt(subject, info["files"]), None, forward,
-                                  ["--json-schema", json.dumps(STYLE_SCHEMA)], on_result=sres.update, slot="quiz")
+                                  ["--json-schema", json.dumps(STYLE_SCHEMA)], on_result=sres.update, slot="quiz", kind="style")
                     guide = (sres.get("structured_output") or {}).get("guide") or guide
                     if guide and (sres.get("structured_output") or {}).get("guide"):
                         save_style(subject, guide, info["sig"])

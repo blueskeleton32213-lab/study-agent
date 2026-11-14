@@ -196,6 +196,59 @@ def extract_docx(path: Path) -> tuple[list[str], int]:
 EXTRACTORS = {".pdf": extract_pdf, ".pptx": extract_pptx, ".docx": extract_docx}
 
 
+TOC_DIR = ROOT / "cache" / "목차"
+HEAD_RE = re.compile(r"^## \[(.+?)\]\s*$", re.M)
+
+
+def page_title(body: str, boiler: set[str]) -> str:
+    """쪽 본문에서 제목으로 쓸 줄: 쪽번호·URL·로고처럼 매 쪽 반복되는 줄은 건너뛴다."""
+    for line in body.splitlines():
+        s = line.strip(" •-·\t")
+        if len(s) < 3 or s.isdigit() or s.startswith(("(🖼", "http")) or s in boiler:
+            continue
+        # 제목처럼 짧은 줄만. 문장 중간에서 시작하는 줄글 쪽은 제목 없음 → 앞 범위에 합친다
+        return s if len(s) <= 32 and not re.search(r"[.,;:。」)]$|[다요음함]\.?$", s) else ""
+    return ""
+
+
+def build_toc(subject: str) -> Path | None:
+    """과목의 목차 파일: 파일마다 '쪽 범위 → 제목' 한 줄씩. Claude가 이걸 먼저 보고 필요한 쪽만 읽게 해서 토큰을 아낀다."""
+    tdir = TEXTS / subject
+    mds = sorted(tdir.rglob("*.md")) if tdir.exists() else []
+    out = TOC_DIR / f"{subject}.md"
+    if not mds:
+        out.unlink(missing_ok=True)
+        return None
+    lines = [f"# {subject} 목차", "형식: 쪽 범위 → 제목 (🖼 = 그림·수식 이미지가 있는 쪽 포함). 출처는 원본 파일명 그대로 쓴다.", ""]
+    for md in mds:
+        text = md.read_text(encoding="utf-8")
+        first = text.splitlines()[0][2:] if text.startswith("# ") else md.name
+        chunks = HEAD_RE.split(text)
+        secs = [(chunks[i], chunks[i + 1]) for i in range(1, len(chunks) - 1, 2)]
+        firsts = [next((l.strip() for l in b.splitlines() if l.strip()), "") for _, b in secs]
+        boiler = {f for f in set(firsts) if f and firsts.count(f) > max(3, len(secs) * 0.3)}
+        lines.append(f"## {first} ({len(secs)}쪽, texts/{md.relative_to(TEXTS).as_posix()})")
+        groups: list[list] = []  # [첫 머리말, 끝 머리말, 제목, 그림 있음]
+        for head, body in secs:
+            m = re.match(r"(?:part|slide|p\.)\s*\d+\s*·\s*(.+)", head)  # Word: "part 4 · 3.3 누적분포함수"
+            title = m.group(1)[:40] if m else page_title(body, boiler)
+            fig = "🖼" in body
+            if groups and (title == groups[-1][2] or not title):
+                groups[-1][1] = head; groups[-1][3] |= fig
+            else:
+                groups.append([head, head, title, fig])
+        for a, b, title, fig in groups:
+            num = re.sub(r"\s*·.*", "", b)
+            rng = a if a == b else f"{re.sub(r'\s*·.*', '', a)}–{re.sub(r'^\D+', '', num)}"
+            lines.append(f"- {rng}{' 🖼' if fig else ''} {title}".rstrip())
+        lines.append("")
+    TOC_DIR.mkdir(parents=True, exist_ok=True)
+    new = "\n".join(lines)
+    if not out.exists() or out.read_text(encoding="utf-8") != new:
+        out.write_text(new, encoding="utf-8")
+    return out
+
+
 def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     force = "--force" in sys.argv
@@ -242,6 +295,7 @@ def main() -> None:
                 print(f"[정리] {rel} (원본 없음)")
         if tdir.exists() and not any(tdir.rglob("*")):
             tdir.rmdir()
+        build_toc(subject.name)
     print(f"완료: 새로 추출 {done}개, 변경 없음 {skipped}개" + (f", 정리 {pruned}개" if pruned else ""))
 
 
