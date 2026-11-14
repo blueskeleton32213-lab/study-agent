@@ -131,8 +131,21 @@ def cmd_explore(args: list[str]) -> None:
             print(f"{unescape(href)}\t{re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]+>', ' ', inner))).strip()[:80]}")
 
 
-SYNCED_FILE = ROOT / "data" / "iclass_synced.json"  # 이미 받은 iClass 파일 id (지운 파일을 다시 받지 않게)
+KNOWN_FILE = ROOT / "data" / "iclass_files.json"  # iClass 파일 id → 파일 이름 (폴더에 있는지 볼 때 서버에 안 묻게)
 KEEP = {".pdf", ".pptx", ".docx"}  # extract.py가 읽을 수 있는 것만 받는다
+
+
+def load_known() -> dict[str, str]:
+    try:
+        data = json.loads(KNOWN_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_known(known: dict[str, str]) -> None:
+    KNOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    KNOWN_FILE.write_text(json.dumps(known, ensure_ascii=False, indent=0), encoding="utf-8")
 
 
 def subject_name(course: str) -> str | None:
@@ -166,7 +179,9 @@ def cmd_sync(args: list[str]) -> None:
     dry = "--dry" in args
     names = [a for a in args if a != "--dry"]
     s, r = logged_in_session()
-    synced = set(json.loads(SYNCED_FILE.read_text(encoding="utf-8"))) if SYNCED_FILE.exists() else set()
+    # 판단 기준은 '폴더에 그 파일이 있는가'. id → 파일 이름은 기억만 해 두고(매번 서버에 묻지 않으려고),
+    # 지운 파일·지운 과목은 다음 받기 때 다시 받는다
+    known = load_known()
     total, skipped_types, viewer_only = 0, {}, []
     for c in course_links(r.text):
         subj = subject_name(c["name"])
@@ -174,8 +189,16 @@ def cmd_sync(args: list[str]) -> None:
             continue
         folder = MATERIALS / subj
         page = get(s, c["url"])
-        new = [f for f in file_links(page.text) if f["id"] not in synced]
-        print(f"\n[{subj}] iClass 파일 {len(file_links(page.text))}개, 새로 확인할 것 {len(new)}개", flush=True)
+        links = file_links(page.text)
+        new = []
+        for f in links:
+            name = known.get(f["id"])
+            if name and Path(name).suffix.lower() not in KEEP:
+                ext = Path(name).suffix.lower() or "(없음)"
+                skipped_types[ext] = skipped_types.get(ext, 0) + 1
+            elif not (name and (folder / name).exists()):
+                new.append(f)
+        print(f"\n[{subj}] iClass 파일 {len(links)}개, 폴더에 없는 것 {len(new)}개", flush=True)
         for f in new:
             fr = s.get(f"{BASE}/mod/ubfile/view.php?id={f['id']}", timeout=60, stream=True)
             if "text/html" in fr.headers.get("content-type", ""):
@@ -183,18 +206,15 @@ def cmd_sync(args: list[str]) -> None:
                 fr.close(); viewer_only.append(f"{subj}: {f['title']}")
                 print(f"  ! {f['title']} (다운로드 막힘, iClass 뷰어로만 볼 수 있음)"); continue
             name = filename_of(fr)
+            known[f["id"]] = name
             ext = Path(name).suffix.lower()
             if ext not in KEEP:
                 fr.close(); skipped_types[ext or "(없음)"] = skipped_types.get(ext or "(없음)", 0) + 1
                 print(f"  - {name} (형식 {ext or '없음'}은 안 받음)")
-                if not dry:
-                    synced.add(f["id"])
                 continue
             dest = folder / name
             if dest.exists():
                 fr.close(); print(f"  = {name} (이미 있음)")
-                if not dry:
-                    synced.add(f["id"])
                 continue
             if dry:
                 fr.close(); print(f"  + {name}"); total += 1; continue
@@ -204,13 +224,11 @@ def cmd_sync(args: list[str]) -> None:
                 for chunk in fr.iter_content(1 << 16):
                     out.write(chunk)
             tmp.replace(dest)
-            synced.add(f["id"])
             total += 1
             print(f"  + {name}", flush=True)
-            SYNCED_FILE.write_text(json.dumps(sorted(synced)), encoding="utf-8")
+            save_known(known)
+    save_known(known)  # 파일 이름 기억은 미리보기(--dry)여도 남겨도 된다 (받은 기록이 아니라 이름표)
     if not dry:
-        SYNCED_FILE.parent.mkdir(parents=True, exist_ok=True)
-        SYNCED_FILE.write_text(json.dumps(sorted(synced)), encoding="utf-8")
         save_state(s)
     print(f"\n{'받을' if dry else '새로 받은'} 자료 {total}개"
           + (f" / 안 받은 형식: {', '.join(f'{k} {v}개' for k, v in skipped_types.items())}" if skipped_types else "")

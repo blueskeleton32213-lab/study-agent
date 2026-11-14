@@ -1429,7 +1429,7 @@ document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
     if (qz) closeQuiz();
     if (st) closeStudio();
     if (hv) closeHistory();
-    if (rv || qz || st || hv) return;  // 닫기를 취소한 경우(예: 만드는 중 확인 창에서 취소)
+    if (rv || quizShown() || st || hv) return;  // 닫기를 취소한 경우(예: 만드는 중 확인 창에서 취소)
     history = []; sessionId = null; chatId = null; store.set("history", []); store.set("session", null); store.set("chatId", null); renderHistory();
     return $("#input").focus();
   }
@@ -1489,7 +1489,7 @@ function closeStudio() {
     ask({ title: "만들기를 취소할까요?", desc: "아직 자료를 만드는 중이에요. 취소하면 지금까지 한 작업은 저장되지 않아요.",
           ok: "만들기 취소", cancel: "계속 만들기", danger: true }).then(yes => {
       if (!yes || st?.view !== "gen") return;
-      api("/api/stop", { method: "POST" }).catch(() => {});
+      api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "job" }) }).catch(() => {});
       if (st?.timer) clearInterval(st.timer);
       st = null; $("main").classList.remove("studio"); $("#studiov").hidden = true;
     });
@@ -1629,7 +1629,7 @@ async function openHistory() {
   if (rv) closeReview();
   if (qz) closeQuiz();
   if (st) closeStudio();
-  if (rv || qz || st) return;
+  if (rv || quizShown() || st) return;
   hv = { chats: [], q: "", subj: "" };  // subj: "" = 전체, null = 과목 없음
   $("#hvSearch").value = "";
   $("main").classList.add("histing"); $("#historyv").hidden = false;
@@ -1741,6 +1741,7 @@ const KEYS = ["A", "B", "C", "D"];
 const saveQuiz = () => store.set("quiz", qz && qz.phase !== "gen" && qz.phase !== "done" && !qz.peek ? { ...qz, phase: qz.phase === "grading" ? "answer" : qz.phase } : null);
 
 async function openQuizSetup() {
+  if (qz) { showQuizView(); return renderQuiz(); }  // 뒤에서 만들던(또는 다 만든) 퀴즈로 돌아가기
   if (busy) return toast("답변이 끝난 뒤에 시작할 수 있어요");
   const saved = store.get("quiz", null);
   if (saved?.qs?.length) {
@@ -1805,8 +1806,13 @@ function showQuizView() {
   $("main").classList.add("quizzing"); $("#quizv").hidden = false;
   if (document.activeElement) document.activeElement.blur();
 }
-function closeQuiz() {
-  if (qz?.phase === "gen") api("/api/stop", { method: "POST" }).catch(() => {});
+function quizShown() { return !!qz && !$("#quizv").hidden; }
+function closeQuiz(cancel = false) {
+  if (qz?.phase === "gen" && !cancel) {  // 출제 중에 다른 화면으로 가면 멈추지 않고 뒤에서 계속 만든다
+    $("main").classList.remove("quizzing"); $("#quizv").hidden = true;
+    return;
+  }
+  if (qz?.phase === "gen") api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "job" }) }).catch(() => {});
   saveQuiz(); qz = null;
   $("main").classList.remove("quizzing"); $("#quizv").hidden = true;
   loadState();
@@ -1822,7 +1828,7 @@ async function startQuiz(cfg) {
   if (busy) return toast("답변이 끝난 뒤에 시작할 수 있어요");
   store.set("quiz", null);
   qz = { cfg, qs: [], idx: 0, phase: "gen", saved: false, retry: false, tools: [], t0: Date.now() };
-  showQuizView(); renderQuiz(); setBusy(true);
+  showQuizView(); renderQuiz();  // 출제는 따로 돌아가서, 만드는 동안 질문하기로 가도 계속 만든다
   const me = qz;
   try {
     const res = await api("/api/quiz/generate", { method: "POST", stream: true, body: JSON.stringify(cfg) });
@@ -1841,10 +1847,10 @@ async function startQuiz(cfg) {
       }
     }
   } catch (e) { me.err = e.message; }
-  setBusy(false);
   if (qz !== me) return; // 취소됨
   if (me.qs.length) { me.phase = "answer"; me.err = null; } else { me.phase = "error"; me.err ||= "문제를 받지 못했어요. 범위를 바꿔서 다시 해보세요."; }
   saveQuiz(); renderQuiz();
+  if ($("#quizv").hidden) toast(me.qs.length ? "퀴즈 문제가 준비됐어요. 왼쪽 퀴즈 메뉴에서 풀 수 있어요" : "퀴즈를 만들지 못했어요. 퀴즈 메뉴에서 확인해 주세요");
 }
 
 function qHeader(q) {
@@ -1869,7 +1875,7 @@ function renderQuiz() {
     actions.innerHTML = qz.phase === "gen"
       ? `<div class="row"><button class="btn" id="qzCancel">취소</button></div>`
       : `<div class="row"><button class="btn" id="qzCancel">닫기</button><button class="btn primary" id="qzRetryGen">다시 만들기</button></div>`;
-    $("#qzCancel").onclick = closeQuiz;
+    $("#qzCancel").onclick = () => closeQuiz(true);
     const r = $("#qzRetryGen"); if (r) r.onclick = () => startQuiz(qz.cfg);
     return;
   }
@@ -2011,7 +2017,7 @@ function renderQuizDone() {
 }
 
 document.addEventListener("keydown", e => {
-  if (!qz || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
+  if (!quizShown() || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
   if (document.querySelector("dialog[open]")) return;
   if (e.key === "Escape") { e.preventDefault(); return exitQuiz(); }
   if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
@@ -2203,7 +2209,7 @@ function submit() {
   const msg = current && !v.startsWith("/") ? `[현재 과목: ${current}]\n${v}` : v;
   send(msg, v);
 }
-$("#sendBtn").onclick = () => busy ? api("/api/stop", { method: "POST" }) : submit();
+$("#sendBtn").onclick = () => busy ? api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "chat" }) }) : submit();
 
 setInterval(() => api("/api/ping").catch(() => {}), 30000);
 document.addEventListener("click", e => {

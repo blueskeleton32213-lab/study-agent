@@ -45,7 +45,13 @@ def code_version() -> float:
 
 STARTED_VERSION = code_version()
 state_lock = threading.Lock()
-current_proc: subprocess.Popen | None = None
+# Claude 실행 칸: chat(질문·설명) / job(퀴즈 출제·스튜디오 만들기). 칸마다 하나씩이라 퀴즈를 만드는 동안에도 질문할 수 있다
+procs: dict[str, subprocess.Popen] = {}
+
+
+def is_busy(slot: str | None = None) -> bool:
+    with state_lock:
+        return any(p.poll() is None for k, p in procs.items() if slot in (None, k))
 last_seen = time.time()
 
 
@@ -271,16 +277,15 @@ def tool_label(name: str, inp: dict) -> str:
 
 
 def stream_claude(message: str, session_id: str | None, send, extra: list[str] | None = None,
-                  on_result=None) -> None:
+                  on_result=None, slot: str = "chat") -> None:
     """claude -p 를 실행하며 이벤트를 send로 흘려보낸다. on_result가 있으면 result 이벤트를 넘겨준다."""
-    global current_proc
     cmd = [CLAUDE, "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", *(extra or [])]
     if session_id:
         cmd += ["--resume", session_id]
     proc = subprocess.Popen(cmd, cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, creationflags=NO_WINDOW, env=CLAUDE_ENV)
     with state_lock:
-        current_proc = proc
+        procs[slot] = proc
     proc.stdin.write(message.encode("utf-8"))
     proc.stdin.close()
 
@@ -334,8 +339,8 @@ def stream_claude(message: str, session_id: str | None, send, extra: list[str] |
             send({"type": "done", "session_id": session_id})
     finally:
         with state_lock:
-            if current_proc is proc:
-                current_proc = None
+            if procs.get(slot) is proc:
+                del procs[slot]
         if proc.poll() is None:
             proc.kill()
 
@@ -711,12 +716,14 @@ def sync_materials() -> bool:
         return True
 
 
-def stop_claude() -> None:
+def stop_claude(slot: str | None = None) -> None:
+    """slot을 주면 그 칸만, 없으면 전부 멈춘다."""
     with state_lock:
-        proc = current_proc
-    if proc and proc.poll() is None:
-        # claude가 띄운 하위 프로세스까지 함께 종료
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, creationflags=NO_WINDOW)
+        targets = [p for k, p in procs.items() if slot in (None, k)]
+    for proc in targets:
+        if proc.poll() is None:
+            # claude가 띄운 하위 프로세스까지 함께 종료
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, creationflags=NO_WINDOW)
 
 
 # ───────────────────────── iClass 자료 받기 (tools/iclass.py) ─────────────────────────
@@ -854,9 +861,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": True})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return
-            if url.path == "/api/stop":
-                stop_claude()
-                stop_iclass()
+            if url.path == "/api/stop":  # kind: chat(질문 답변 + iClass 받기) / job(퀴즈·스튜디오) / 없으면 전부
+                kind = (json.loads(self._body() or b"{}") or {}).get("kind")
+                stop_claude(kind)
+                if kind != "job":
+                    stop_iclass()
                 return self._json({"ok": True})
             if url.path == "/api/iclass/login":
                 data = json.loads(self._body())
@@ -926,9 +935,7 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/subject/summary":
                 return self._json(subject_summary(safe_name(json.loads(self._body())["name"])))
             if url.path == "/api/subject/delete":
-                with state_lock:
-                    busy = current_proc is not None and current_proc.poll() is None
-                if busy:
+                if is_busy():
                     return self._json({"error": "다른 작업이 진행 중이에요. 끝난 뒤에 지워주세요."}, 409)
                 return self._json(subject_delete(safe_name(json.loads(self._body())["name"])))
             if url.path == "/api/open-file":
@@ -957,10 +964,8 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"error": "not found"}, 404)
 
     def _stream_start(self) -> bool:
-        with state_lock:
-            busy = current_proc is not None and current_proc.poll() is None
-        if busy:
-            self._json({"error": "이전 작업이 아직 진행 중이에요"}, 409)
+        if is_busy("job"):
+            self._json({"error": "퀴즈나 자료를 만드는 중이에요. 끝난 뒤에 다시 해주세요."}, 409)
             return False
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
@@ -969,7 +974,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         return True
 
-    def _sender(self):
+    def _sender(self, slot: str = "job"):
         state = {"alive": True}
 
         def send(obj):
@@ -982,7 +987,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.flush()
             except OSError:  # 화면이 닫힘 → 진행 중인 작업도 중단
                 state["alive"] = False
-                stop_claude()
+                stop_claude(slot)
         return send
 
     def _iclass_sync(self):
@@ -998,7 +1003,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.send_header("Connection", "close")
             self.end_headers()
-            send = self._sender()
+            send = self._sender("iclass")  # 화면이 닫혀도 Claude 작업은 건드리지 않음
             got, subj, blocked = {}, None, []
             try:
                 iclass_proc = subprocess.Popen([PYTHON, str(TOOLS / "iclass.py"), "sync", *subjects], cwd=ROOT,
@@ -1060,7 +1065,7 @@ class Handler(BaseHTTPRequestHandler):
                     send({"type": "tool", "label": f"시험 스타일 분석 중 (자료 {len(info['files'])}개, 처음 한 번)"})
                     sres = {}
                     stream_claude(style_prompt(subject, info["files"]), None, forward,
-                                  ["--json-schema", json.dumps(STYLE_SCHEMA)], on_result=sres.update)
+                                  ["--json-schema", json.dumps(STYLE_SCHEMA)], on_result=sres.update, slot="job")
                     guide = (sres.get("structured_output") or {}).get("guide") or guide
                     if guide and (sres.get("structured_output") or {}).get("guide"):
                         save_style(subject, guide, info["sig"])
@@ -1068,7 +1073,7 @@ class Handler(BaseHTTPRequestHandler):
                 send({"type": "style", "used": bool(guide or note), "files": len(info["files"]), "note": bool(note)})
             prompt = quiz_prompt(subject, (data.get("scope") or "").strip(), n, data.get("level", "보통"),
                                  data.get("qtype", "mix"), guide, note)
-            stream_claude(prompt, None, forward, extra, on_result=result.update)
+            stream_claude(prompt, None, forward, extra, on_result=result.update, slot="job")
             qs = clean_questions((result.get("structured_output") or {}).get("questions") or [])
             if qs:
                 send({"type": "quiz", "questions": qs})
@@ -1100,7 +1105,7 @@ class Handler(BaseHTTPRequestHandler):
                 send(ev)
         try:
             stream_claude(studio_prompt(subject, kind, scope, custom), None, forward,
-                          ["--json-schema", json.dumps(DOC_SCHEMA)], on_result=result.update)
+                          ["--json-schema", json.dumps(DOC_SCHEMA)], on_result=result.update, slot="job")
             doc = result.get("structured_output") or {}
             if doc.get("markdown"):
                 title = doc.get("title") or STUDIO_TYPES.get(kind, ("직접 요청",))[0]
@@ -1118,9 +1123,7 @@ class Handler(BaseHTTPRequestHandler):
         message = (data.get("message") or "").strip()
         if not message:
             return self._json({"error": "빈 메시지"}, 400)
-        with state_lock:
-            busy = current_proc is not None and current_proc.poll() is None
-        if busy:
+        if is_busy("chat"):
             return self._json({"error": "이전 답변이 아직 진행 중이에요"}, 409)
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
@@ -1140,7 +1143,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.flush()
             except OSError:  # 화면이 닫힘 → 진행 중인 작업도 중단
                 alive = False
-                stop_claude()
+                stop_claude("chat")
 
         sync_materials()  # 탐색기로 넣거나 지운 자료를 먼저 반영
         session_id = data.get("session_id")
@@ -1176,9 +1179,7 @@ class Handler(BaseHTTPRequestHandler):
 def idle_watchdog(server: ThreadingHTTPServer) -> None:
     while True:
         time.sleep(15)
-        with state_lock:
-            busy = current_proc is not None and current_proc.poll() is None
-        if not busy and time.time() - last_seen > IDLE_EXIT_SECONDS:
+        if not is_busy() and time.time() - last_seen > IDLE_EXIT_SECONDS:
             server.shutdown()
             return
 
