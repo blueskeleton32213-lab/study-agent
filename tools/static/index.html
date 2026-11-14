@@ -598,7 +598,7 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
     <button class="nav-item" data-act="studio" title="스튜디오" aria-label="스튜디오"><span data-i="studio"></span><span class="lbl">스튜디오</span></button>
     <button class="nav-item" data-act="history" title="대화 기록" aria-label="대화 기록"><span data-i="clock"></span><span class="lbl">대화 기록</span></button>
   </nav>
-  <div class="side-label"><span>과목</span><button class="icon-btn" id="addSubj" title="과목 추가" style="width:28px;height:28px"><span data-i="plus"></span></button></div>
+  <div class="side-label"><span>과목</span><span style="display:flex;gap:2px;margin-left:auto"><button class="icon-btn" id="icBtn" title="iClass에서 새 자료 받기" aria-label="iClass에서 새 자료 받기" style="width:28px;height:28px"><span data-i="download"></span></button><button class="icon-btn" id="addSubj" title="과목 추가" style="width:28px;height:28px"><span data-i="plus"></span></button></span></div>
   <div id="subjects"></div>
   <div class="side-foot">PDF·PPTX·DOCX 파일을 과목 이름 위로 끌어다 놓으면 자료가 추가돼요.<br><button id="openAll">자료 폴더 열기</button></div>
 </aside>
@@ -690,12 +690,41 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
 </dialog>
 <div id="printArea"></div>
 
+<dialog id="askDlg">
+  <form method="dialog">
+    <h3 id="askTitle"></h3>
+    <p class="desc" id="askDesc"></p>
+    <div id="askField"><label for="askInput" id="askLabel"></label><input id="askInput" autocomplete="off"></div>
+    <div class="dlg-btns">
+      <button class="btn" value="cancel" id="askCancel">취소</button>
+      <button class="btn primary" value="ok" id="askOk">확인</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="icDlg">
+  <form method="dialog">
+    <h3>iClass 로그인</h3>
+    <p class="desc" id="icDesc">iClass(learn.inha.ac.kr)에 로그인하면 수강 과목의 새 강의자료를 받아와요.</p>
+    <label for="icUser">학번</label>
+    <input id="icUser" autocomplete="username" inputmode="numeric">
+    <label for="icPw">비밀번호</label>
+    <input id="icPw" type="password" autocomplete="current-password">
+    <p class="desc" style="margin-top:10px">비밀번호는 저장하지 않아요. 로그인 상태만 이 PC에 남고, 학교 서버에서 로그인이 풀리면 다시 물어봐요.</p>
+    <p class="desc err" id="icErr" hidden></p>
+    <div class="dlg-btns">
+      <button class="btn" value="cancel">취소</button>
+      <button class="btn primary" value="ok" id="icOk">로그인</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="delDlg">
   <form method="dialog">
     <h3 id="delTitle">과목 삭제</h3>
     <p class="desc">이 과목과 함께 아래 내용이 모두 지워져요.</p>
     <ul class="del-list" id="delList"></ul>
-    <p class="desc" style="margin-top:14px">지운 내용은 앱 폴더의 <b>휴지통</b>으로 옮겨져서 필요하면 다시 꺼낼 수 있어요. 앱에 넣기 전 원래 파일(예: 바탕화면의 강의자료)은 그대로 남아요.</p>
+    <p class="desc" style="margin-top:14px">지운 내용은 <b>컴퓨터 휴지통</b>으로 옮겨져서, 휴지통에서 '복원'하면 원래 자리로 돌아와요. 앱에 넣기 전 원래 파일(예: 바탕화면의 강의자료)은 그대로 남아요.</p>
     <div class="dlg-btns">
       <button class="btn" value="cancel">취소</button>
       <button class="btn red" value="ok" id="delOk">삭제</button>
@@ -787,6 +816,7 @@ const ICONS = {
   glossary: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M9 8h6"/>',
   custom: '<path d="M14.5 4.5l5 5L9 20H4v-5z"/>',
   doc: '<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5V7h3"/>',
+  download: '<path d="M12 4v11M7 10.5l5 5 5-5"/><path d="M5 19.5h14"/>',
 };
 const icon = (n, s = 18) => `<svg class="i" viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true">${ICONS[n] || ""}</svg>`;
 document.querySelectorAll("[data-i]").forEach(el => { el.outerHTML = icon(el.dataset.i); });
@@ -805,6 +835,34 @@ function toast(text, ms = 2600) {
   const t = document.createElement("div"); t.className = "toast"; t.textContent = text; t.setAttribute("role", "status");
   document.body.append(t); setTimeout(() => t.remove(), ms);
 }
+/* ── 앱 디자인에 맞춘 입력·확인 창 ──
+   입력창: ask({ title, label, value: "" … }) → 입력한 글 또는 null(취소)
+   확인창: ask({ title, desc … })            → true(확인) / false(취소 버튼) / null(Esc)  */
+function ask({ title, desc = "", label = "", value = null, placeholder = "", ok = "확인", cancel = "취소", danger = false }) {
+  const dlg = $("#askDlg"), input = $("#askInput"), isInput = value !== null;
+  if (dlg.open) return Promise.resolve(null);
+  $("#askTitle").textContent = title;
+  $("#askDesc").textContent = desc; $("#askDesc").hidden = !desc;
+  $("#askField").hidden = !isInput; $("#askLabel").textContent = label; $("#askLabel").hidden = !label;
+  input.value = isInput ? value : ""; input.placeholder = placeholder;
+  $("#askOk").textContent = ok; $("#askCancel").textContent = cancel;
+  $("#askOk").className = "btn " + (danger ? "red" : "primary");
+  dlg.returnValue = "";
+  dlg.showModal();
+  if (isInput) { input.focus(); input.select(); }
+  else (danger ? $("#askCancel") : $("#askOk")).focus();  // 지우는 확인창은 실수로 Enter를 눌러도 지워지지 않게
+  return new Promise(resolve => {
+    dlg.addEventListener("close", () => {
+      const r = dlg.returnValue;
+      if (isInput) resolve(r === "ok" ? input.value.trim() : null);
+      else resolve(r === "ok" ? true : r === "cancel" ? false : null);
+    }, { once: true });
+  });
+}
+$("#askInput").addEventListener("keydown", e => {  // 입력창에서 Enter = 확인 (폼 기본 동작은 첫 버튼인 '취소'라서 직접 처리)
+  if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); $("#askDlg").close("ok"); }
+});
+
 function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
 // "A · B · C" 대신 구분선으로 나눈 메타 정보
 const meta = parts => `<span class="meta">${parts.filter(Boolean).map(p => `<span>${esc(p)}</span>`).join("")}</span>`;
@@ -941,8 +999,27 @@ function closeViewer() { vw = null; $("#viewer").hidden = true; document.body.cl
 function stepViewer(d) { if (vw && vw.page + d >= 1 && vw.page + d <= vw.info.count) { vw.page += d; showViewerPage(); } }
 
 /* ── 사이드바 ── */
-async function loadState() {
-  try { state = await (await api("/api/state")).json(); } catch (e) { return; }
+// 과목·자료 목록은 주기적으로(화면이 보일 때 4초, 숨었을 때 20초) 다시 확인해서,
+// 탐색기로 폴더에 직접 넣은 파일도 앱을 다시 켜지 않고 바로 보이게 한다
+let stateTimer = null, lastStateJson = "";
+function scheduleState(ms) { clearTimeout(stateTimer); stateTimer = setTimeout(() => loadState({ poll: true }), ms); }
+document.addEventListener("visibilitychange", () => { if (!document.hidden) loadState({ poll: true }); });
+window.addEventListener("focus", () => loadState({ poll: true }));  // 탐색기에서 파일 넣고 돌아왔을 때 바로
+async function loadState(opt = {}) {
+  clearTimeout(stateTimer);
+  let next;
+  try { next = await (await api("/api/state")).json(); }
+  catch (e) { return scheduleState(document.hidden ? 20000 : 4000); }
+  // 탐색기로 넣거나 지운 자료를 서버가 맞추는 중이면 안내하고, 끝날 때까지 자주 확인
+  if (next.syncing) {
+    if (!loadState.syncing) toast("자료 폴더가 바뀐 걸 찾아서 반영하는 중이에요", 3000);
+    loadState.syncing = true;
+  } else if (loadState.syncing) { loadState.syncing = false; toast("바뀐 자료를 반영했어요"); }
+  scheduleState(next.syncing ? 1500 : document.hidden ? 20000 : 4000);
+  const json = JSON.stringify(next);
+  // 바뀐 게 없으면 다시 그리지 않는다 (끌기·키보드 포커스가 끊기지 않게). 과목을 끌고 있는 중에도 미룬다
+  if (opt.poll && (json === lastStateJson || dragSubj)) return;
+  lastStateJson = json; state = next;
   // 항상 과목 하나가 선택돼 있게: 없거나 사라졌으면 자료가 있는 첫 과목으로
   if (!state.subjects.some(s => s.name === current)) {
     current = (state.subjects.find(s => s.files.length) || state.subjects[0])?.name ?? null;
@@ -1103,14 +1180,16 @@ async function upload(subject, files) {
       const warn = (r.log || "").split("\n").filter(l => l.includes("⚠") || l.includes("실패"));
       toast(warn.length ? `${f.name}을(를) 추가했어요\n${warn.join("\n")}` : `${f.name}을(를) 추가했어요`, warn.length ? 6000 : 2600);
     } catch (e) { toast(`추가하지 못했어요: ${e.message}`, 5000); }
+    expanded = subject; current = subject; store.set("subject", current);
+    await loadState();  // 파일 하나 올릴 때마다 목록에 바로 보이게
   }
-  await loadState();
   if (!busy) send(`/ingest ${subject}`, `「${subject}」에 새 자료를 추가했어요. 정리해줘`);
 }
 $("#addSubj").onclick = async () => {
-  const name = prompt("과목 이름 (예: 운영체제)");
+  const name = await ask({ title: "과목 추가", desc: "과목을 만들면 자료를 넣을 폴더가 생겨요. 파일은 과목 이름 위로 끌어다 놓으면 돼요.",
+    label: "과목 이름", value: "", placeholder: "예: 운영체제", ok: "추가" });
   if (!name) return;
-  try { await api("/api/subject", { method: "POST", body: JSON.stringify({ name }) }); current = name.trim(); store.set("subject", current); await loadState(); toast("과목을 만들었어요. 파일을 과목 이름 위로 끌어다 놓으세요"); }
+  try { await api("/api/subject", { method: "POST", body: JSON.stringify({ name }) }); current = expanded = name.trim(); store.set("subject", current); await loadState(); toast("과목을 만들었어요. 파일을 과목 이름 위로 끌어다 놓으세요"); }
   catch (e) { toast(e.message); }
 };
 async function askDeleteSubject(name) {
@@ -1132,7 +1211,7 @@ $("#delDlg").addEventListener("close", async () => {
     // 선택돼 있던 과목이면 loadState()가 남은 과목 중 하나를 자동으로 고른다
     if (st && st.subject === name) closeStudio();
     await loadState();
-    toast(`${name}을(를) 휴지통으로 옮겼어요`);
+    toast(`${name}을(를) 컴퓨터 휴지통으로 옮겼어요`);
   } catch (e) { toast(e.message, 6000); }
 });
 $("#openAll").onclick =() => api(current ? `/api/open?subject=${encodeURIComponent(current)}` : "/api/open", { method: "POST" });
@@ -1192,7 +1271,9 @@ async function send(message, shown) {
   let text = "", raf = 0, errored = false;
   const paint = () => { raf = 0; body.innerHTML = md(text); scrollDown(); };
   try {
-    const res = await api("/api/chat", { method: "POST", stream: true, body: JSON.stringify({ message, session_id: sessionId }) });
+    // context: 이어가기가 안 될 때(폴더 이동 등) 서버가 이 최근 대화를 붙여서 새로 시작한다
+    const context = history.slice(0, -1).slice(-12).filter(h => h.role !== "notice");
+    const res = await api("/api/chat", { method: "POST", stream: true, body: JSON.stringify({ message, session_id: sessionId, context }) });
     if (!res.ok) { let m = res.statusText; try { m = (await res.json()).error; } catch {} throw new Error(m); }
     const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
     for (;;) {
@@ -1223,6 +1304,113 @@ async function send(message, shown) {
   $("#input").focus();
 }
 
+/* ── iClass에서 새 자료 받기 ── */
+// 로그인 창: 성공하면 true, 취소하면 false. 비밀번호는 서버로 한 번 보내고 화면에서도 바로 지운다
+function iclassLogin(reason) {
+  const dlg = $("#icDlg");
+  if (dlg.open) return Promise.resolve(false);
+  $("#icDesc").textContent = reason || "iClass(learn.inha.ac.kr)에 로그인하면 수강 과목의 새 강의자료를 받아와요.";
+  $("#icErr").hidden = true; $("#icPw").value = "";
+  $("#icUser").value = store.get("icUser", "");
+  dlg.returnValue = "";
+  dlg.showModal();
+  ($("#icUser").value ? $("#icPw") : $("#icUser")).focus();
+  return new Promise(resolve => {
+    const ok = $("#icOk");
+    const onOk = async e => {
+      e.preventDefault();
+      const user = $("#icUser").value.trim(), password = $("#icPw").value;
+      if (!user || !password) { $("#icErr").textContent = "학번과 비밀번호를 모두 넣어주세요"; $("#icErr").hidden = false; return; }
+      ok.disabled = true; ok.textContent = "확인 중…";
+      try {
+        const res = await fetch("/api/iclass/login", { method: "POST", headers: { "X-Study-App": "1" }, body: JSON.stringify({ user, password }) });
+        const r = await res.json();
+        if (r.ok) { store.set("icUser", user); dlg.close("ok"); }
+        else { $("#icErr").textContent = r.message || r.error || "로그인하지 못했어요"; $("#icErr").hidden = false; }
+      } catch (err) { $("#icErr").textContent = "서버와 연결하지 못했어요: " + err.message; $("#icErr").hidden = false; }
+      finally { $("#icPw").value = ""; ok.disabled = false; ok.textContent = "로그인"; if (dlg.open) $("#icPw").focus(); }
+    };
+    ok.addEventListener("click", onOk);
+    dlg.addEventListener("close", () => { ok.removeEventListener("click", onOk); $("#icPw").value = ""; resolve(dlg.returnValue === "ok"); }, { once: true });
+  });
+}
+
+async function iclassSync(subjects = [], shown = null) {
+  if (busy) return toast("다른 작업이 끝난 뒤에 받을 수 있어요");
+  if (rv) closeReview();
+  if (qz) closeQuiz();
+  if (st) closeStudio();
+  if (hv) closeHistory();
+  if (!history.length) $("#msgs").innerHTML = "";
+  if (shown) { history.push({ role: "user", text: shown }); bubble("user", shown); }
+  const holder = document.createElement("div"); holder.className = "msg bot";
+  const inner = document.createElement("div"); inner.className = "bubble md";
+  const tools = document.createElement("div"); tools.className = "tools";
+  const body = document.createElement("div");
+  const typing = document.createElement("div"); typing.className = "typing"; typing.textContent = "iClass에 접속하는 중";
+  inner.append(tools, body, typing); holder.append(inner); $("#msgs").append(holder);
+  scrollDown(true); setBusy(true);
+
+  let result = null, failed = "", needLogin = false;
+  const run = async () => {
+    needLogin = false;
+    const res = await api("/api/iclass/sync", { method: "POST", stream: true, body: JSON.stringify({ subjects }) });
+    if (!res.ok) { let m = res.statusText; try { m = (await res.json()).error; } catch {} throw new Error(m); }
+    const reader = res.body.getReader(), dec = new TextDecoder(); let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 1);
+        if (!line.trim()) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "line") {
+          const m = ev.text.match(/^\[(.+?)\]/);
+          if (m) { const t = document.createElement("span"); t.className = "tool"; t.textContent = m[1]; tools.append(t); }
+          typing.textContent = ev.text.trim().replace(/^\+ /, "받는 중: "); scrollDown();
+        }
+        else if (ev.type === "need_login") needLogin = true;
+        else if (ev.type === "result") result = ev;
+        else if (ev.type === "error") failed = ev.message;
+      }
+    }
+  };
+  try {
+    await run();
+    if (needLogin) {
+      typing.textContent = "iClass 로그인을 기다리는 중";
+      if (await iclassLogin("iClass 로그인이 필요해요. 로그인하면 바로 이어서 받아요.")) { tools.innerHTML = ""; typing.textContent = "iClass에 접속하는 중"; await run(); }
+    }
+  } catch (e) { failed = "서버와 연결이 끊겼어요: " + e.message; }
+  typing.remove();
+  if (!tools.children.length) tools.remove();
+
+  let text;
+  if (result) {
+    const subs = Object.entries(result.got || {}), n = subs.reduce((a, [, f]) => a + f.length, 0);
+    text = n ? `**iClass에서 새 자료 ${n}개를 받았어요.**\n\n` + subs.map(([s, f]) => `- **${s}** ${f.length}개: ${f.join(", ")}`).join("\n")
+             : "iClass에 새로 올라온 자료가 없어요. 이미 다 받아 뒀어요.";
+    if (result.blocked?.length) text += `\n\n다운로드가 막혀 있어서 못 받은 자료 ${result.blocked.length}개 (iClass 뷰어로만 볼 수 있어요. 파일이 있으면 과목 위로 끌어다 넣어주세요):\n` + result.blocked.map(b => `- ${b}`).join("\n");
+    if (subs.length) { current = expanded = subs[0][0]; store.set("subject", current); }
+  } else if (needLogin) text = "로그인을 취소해서 받지 않았어요.";
+  else text = failed || "(멈췄어요)";
+  body.innerHTML = md(text);
+  if (failed && result) { const e = document.createElement("div"); e.className = "err"; e.textContent = failed; inner.append(e); }
+  history.push({ role: "bot", text });
+  store.set("history", history.slice(-200));
+  saveChat();
+  setBusy(false); await loadState(); scrollDown(true);
+  $("#input").focus();
+}
+$("#icBtn").onclick = () => iclassSync([], null);
+for (const id of ["#icUser", "#icPw"]) $(id).addEventListener("keydown", e => {  // Enter = 로그인 (폼 기본 동작은 첫 버튼인 '취소')
+  if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); if (id === "#icUser") $("#icPw").focus(); else $("#icOk").click(); }
+});
+// 대화창에서 "최신으로 받아줘", "iClass에서 과목 추가해줘" 같은 말은 Claude 대신 바로 받기로
+// '받아들이다'·'iClass 과제 마감?' 같은 질문은 걸리지 않게, 받기를 뜻하는 말이 있을 때만
+const ICLASS_RE = /((i-?class|아이클래스).*(받아\s*(줘|와|오|올|놔|둬)|받기|받자|가져\s*(와|오)|불러\s*(와|오)|동기화|다운|추가|최신))|((최신|새\s*(자료|파일|강의)|새로\s*올라온|올라온\s*(자료|거)).*(받아\s*(줘|와|오|올|놔|둬)|받기|받자|가져\s*(와|오)|불러\s*(와|오)|동기화|다운))|(과목.*(추가해|받아\s*(줘|와|오)|가져\s*(와|오)))/i;
+
 /* ── 메뉴·머리 버튼 ── */
 const scope = () => current ? ` ${current}` : "";
 document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
@@ -1249,8 +1437,13 @@ document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
   if (a === "studio") return openStudio();
   if (a === "history") return openHistory();
   if (a === "review") return openReview();
-  if (a === "weak") return send(`/weak${scope()}`, `약점 분석${current ? ` (${current})` : ""}`);
-  if (a === "ingest") return send(`/ingest${scope()}`, `자료 요약${current ? ` (${current})` : ""}`);
+  // 과목·자료·기록이 없으면 Claude를 부르지 않고 안내만
+  const cur = state.subjects.find(s => s.name === current);
+  if ((a === "weak" || a === "ingest") && !cur) return toast("먼저 왼쪽 + 버튼으로 과목을 만들어 주세요");
+  if (a === "ingest" && !cur.files.length) return toast(`${cur.name}에 아직 자료가 없어요. 파일을 과목 이름 위로 끌어다 놓으세요`, 3500);
+  if (a === "weak" && !cur.cards) return toast(`${cur.name}에 아직 틀린 문제 기록이 없어요. 퀴즈를 먼저 풀어보세요`, 3500);
+  if (a === "weak") return send(`/weak${scope()}`, `약점 분석 (${current})`);
+  if (a === "ingest") return send(`/ingest${scope()}`, `자료 요약 (${current})`);
 });
 $("#quizDlg").addEventListener("close", async () => {
   if ($("#quizDlg").returnValue !== "ok") return;
@@ -1293,8 +1486,14 @@ function openStudio() {
 }
 function closeStudio() {
   if (st?.view === "gen") {
-    if (!confirm("아직 만드는 중이에요. 취소할까요?")) return;
-    api("/api/stop", { method: "POST" }).catch(() => {});
+    ask({ title: "만들기를 취소할까요?", desc: "아직 자료를 만드는 중이에요. 취소하면 지금까지 한 작업은 저장되지 않아요.",
+          ok: "만들기 취소", cancel: "계속 만들기", danger: true }).then(yes => {
+      if (!yes || st?.view !== "gen") return;
+      api("/api/stop", { method: "POST" }).catch(() => {});
+      if (st?.timer) clearInterval(st.timer);
+      st = null; $("main").classList.remove("studio"); $("#studiov").hidden = true;
+    });
+    return;
   }
   if (st?.timer) clearInterval(st.timer);
   st = null; $("main").classList.remove("studio"); $("#studiov").hidden = true;
@@ -1348,7 +1547,7 @@ function renderStudio() {
       ${d.markdown ? md(d.markdown) : '<div class="typing">불러오는 중</div>'}</article></div>`;
     $("#stPrint").onclick = () => { $("#printArea").innerHTML = $("#stDoc").innerHTML; window.print(); };
     $("#stDel").onclick = async () => {
-      if (!confirm(`"${d.title}"을(를) 삭제할까요? 되돌릴 수 없어요.`)) return;
+      if (!await ask({ title: "정리 자료를 삭제할까요?", desc: `"${d.title}"을(를) 컴퓨터 휴지통으로 옮겨요. 휴지통에서 복원할 수 있어요.`, ok: "삭제", danger: true })) return;
       try { await api("/api/studio/delete", { method: "POST", body: JSON.stringify({ path: d.path }) }); } catch (e) { return toast(e.message); }
       st.view = "home"; loadStudio(); toast("삭제했어요");
     };
@@ -1512,7 +1711,7 @@ async function openChat(id) {
 }
 async function deleteChat(id) {
   const c = hv?.chats.find(x => x.id === id);
-  if (!confirm(`"${c?.title || "이 대화"}" 기록을 삭제할까요? 되돌릴 수 없어요.`)) return;
+  if (!await ask({ title: "대화 기록을 삭제할까요?", desc: `"${c?.title || "이 대화"}" 기록을 컴퓨터 휴지통으로 옮겨요. 휴지통에서 복원할 수 있어요.`, ok: "삭제", danger: true })) return;
   try { await api("/api/chats/delete", { method: "POST", body: JSON.stringify({ id }) }); } catch (e) { return toast(e.message); }
   if (id === chatId) {  // 지금 보고 있던 대화를 지웠으면 새 대화로
     history = []; sessionId = null; chatId = null;
@@ -1523,8 +1722,8 @@ async function deleteChat(id) {
 }
 async function renameChat(id) {
   const c = hv?.chats.find(x => x.id === id);
-  const title = prompt("대화 제목", c?.title || "");
-  if (!title || !title.trim()) return;
+  const title = await ask({ title: "대화 제목 바꾸기", label: "제목", value: c?.title || "", ok: "바꾸기" });
+  if (!title) return;
   try { await api("/api/chats/rename", { method: "POST", body: JSON.stringify({ id, title }) }); } catch (e) { return toast(e.message); }
   loadChats();
 }
@@ -1541,11 +1740,14 @@ const VERDICT = { correct: ["✓", "정답"], partial: ["△", "부분 정답"],
 const KEYS = ["A", "B", "C", "D"];
 const saveQuiz = () => store.set("quiz", qz && qz.phase !== "gen" && qz.phase !== "done" && !qz.peek ? { ...qz, phase: qz.phase === "grading" ? "answer" : qz.phase } : null);
 
-function openQuizSetup() {
+async function openQuizSetup() {
   if (busy) return toast("답변이 끝난 뒤에 시작할 수 있어요");
   const saved = store.get("quiz", null);
-  if (saved?.qs?.length && confirm(`풀던 퀴즈가 있어요 (${saved.cfg.subject}, ${saved.idx + 1}/${saved.qs.length}번). 이어서 풀까요?\n취소를 누르면 새 퀴즈를 만들어요.`)) {
-    qz = saved; showQuizView(); return renderQuiz();
+  if (saved?.qs?.length) {
+    const go = await ask({ title: "풀던 퀴즈가 있어요", desc: `${saved.cfg.subject} 퀴즈를 ${saved.qs.length}문제 중 ${saved.idx + 1}번까지 풀었어요. 이어서 풀까요?`,
+                           ok: "이어서 풀기", cancel: "새 퀴즈 만들기" });
+    if (go === null) return;
+    if (go) { qz = saved; showQuizView(); return renderQuiz(); }
   }
   const subs = state.subjects.filter(s => s.files.length);
   if (!subs.length) return toast("먼저 과목을 만들고 자료를 넣어주세요");
@@ -1609,8 +1811,9 @@ function closeQuiz() {
   $("main").classList.remove("quizzing"); $("#quizv").hidden = true;
   loadState();
 }
-function exitQuiz() {
-  if (qz && !qz.peek && ["answer", "grading", "feedback"].includes(qz.phase) && !confirm("퀴즈를 그만둘까요? 다음에 퀴즈를 열면 이어서 풀 수 있어요.")) return;
+async function exitQuiz() {
+  if (qz && !qz.peek && ["answer", "grading", "feedback"].includes(qz.phase) &&
+      !await ask({ title: "퀴즈를 그만둘까요?", desc: "푼 곳까지 저장돼요. 다음에 퀴즈를 열면 이어서 풀 수 있어요.", ok: "그만두기", cancel: "계속 풀기" })) return;
   if (qz?.phase === "done") store.set("quiz", null);
   closeQuiz();
 }
@@ -1889,7 +2092,7 @@ function renderReview() {
   if (rv.revealed) {
     $("#rvWhy").onclick = () => explain(card);
     $("#rvDel").onclick = async () => {
-      if (!confirm("이 카드를 삭제할까요? 되돌릴 수 없어요.")) return;
+      if (!await ask({ title: "복습 카드를 삭제할까요?", desc: "이 카드를 지우면 다시 복습에 나오지 않아요. 되돌릴 수 없어요.", ok: "삭제", danger: true })) return;
       try { await api("/api/card/delete", { method: "POST", body: JSON.stringify({ id: card.id }) }); } catch (e) { return toast(e.message); }
       rv.queue = rv.queue.filter(q => q.card.id !== card.id); rv.total -= repeat ? 0 : 1; rv.revealed = false; renderReview();
     };
@@ -1993,6 +2196,10 @@ function submit() {
   if (busy) return;
   const v = input.value.trim(); if (!v) return;
   input.value = ""; input.style.height = "auto";
+  if (!v.startsWith("/") && ICLASS_RE.test(v)) {  // 말한 과목이 있으면 그 과목만, 없으면 전부
+    const named = state.subjects.map(s => s.name).filter(n => v.includes(n));
+    return iclassSync(named, v);
+  }
   const msg = current && !v.startsWith("/") ? `[현재 과목: ${current}]\n${v}` : v;
   send(msg, v);
 }

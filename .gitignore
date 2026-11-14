@@ -6,9 +6,8 @@ texts/
 studio/
 # 개인 공부 기록: 복습 카드, 대화 기록, 시험 스타일, 과목 순서
 data/
-# 임시 파일·지운 과목
+# 임시 파일
 cache/
-휴지통/
 
 # Python
 __pycache__/

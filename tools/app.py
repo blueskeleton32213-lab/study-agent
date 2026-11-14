@@ -35,6 +35,8 @@ import srs  # noqa: E402  복습 카드는 Claude 없이 직접 처리
 srs_lock = threading.Lock()
 CLAUDE = shutil.which("claude") or str(Path.home() / ".local" / "bin" / "claude.exe")
 PYTHON = sys.executable.replace("pythonw.exe", "python.exe")
+# 앱이 띄우는 Claude 표시: 작업 기록 Stop 훅(.claude/hooks/worklog_check.py)이 공부 대화에선 끼어들지 않게
+CLAUDE_ENV = {**os.environ, "STUDY_APP": "1"}
 
 def code_version() -> float:
     """서버 코드(tools/*.py)의 최신 수정 시각. 실행 중에 코드가 바뀌면 launch.pyw가 서버를 교체한다."""
@@ -123,8 +125,29 @@ def save_order(order: list[str]) -> None:
     ORDER_FILE.write_text(json.dumps([safe_name(n) for n in order], ensure_ascii=False), encoding="utf-8")
 
 
+syncing = {"on": False}
+
+
+def background_sync() -> bool:
+    """어긋나 있으면 백그라운드에서 맞추기 시작. 맞추는 중이면 True."""
+    if syncing["on"]:
+        return True
+    if not materials_out_of_sync():
+        return False
+
+    def work():
+        try:
+            sync_materials()
+        finally:
+            syncing["on"] = False
+    syncing["on"] = True
+    threading.Thread(target=work, daemon=True).start()
+    return True
+
+
 def app_state() -> dict:
     MATERIALS.mkdir(exist_ok=True)
+    is_syncing = background_sync()
     with srs_lock:
         stats = srs.stats()
     subjects = []
@@ -136,7 +159,7 @@ def app_state() -> dict:
         s = stats.get(name, {})
         subjects.append({"name": name, "files": files, "cards": s.get("카드수", 0),
                          "due": s.get("오늘복습", 0), "weak": s.get("자주틀린주제", [])[:3]})
-    return {"subjects": subjects, "due": sum(s["due"] for s in subjects)}
+    return {"subjects": subjects, "due": sum(s["due"] for s in subjects), "syncing": is_syncing}
 
 
 # ───────────────────────── 출처 보기 ─────────────────────────
@@ -255,7 +278,7 @@ def stream_claude(message: str, session_id: str | None, send, extra: list[str] |
     if session_id:
         cmd += ["--resume", session_id]
     proc = subprocess.Popen(cmd, cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, creationflags=NO_WINDOW)
+                            stderr=subprocess.PIPE, creationflags=NO_WINDOW, env=CLAUDE_ENV)
     with state_lock:
         current_proc = proc
     proc.stdin.write(message.encode("utf-8"))
@@ -482,7 +505,8 @@ feedback: 존댓말 2~3문장. 학생 답에서 맞은 점과 틀린/빠진 점�
 확인 질문, 복습 카드 저장 제안, "자료를 확인하지 않았다" 같은 말은 쓰지 않는다.
 missing: 학생 답에 빠진 핵심 키워드 (없으면 빈 배열)."""
     r = subprocess.run([CLAUDE, "-p", "--tools", "", "--output-format", "json", "--json-schema", json.dumps(GRADE_SCHEMA)],
-                       cwd=ROOT, input=prompt.encode("utf-8"), capture_output=True, creationflags=NO_WINDOW, timeout=180)
+                       cwd=ROOT, input=prompt.encode("utf-8"), capture_output=True, creationflags=NO_WINDOW, timeout=180,
+                       env=CLAUDE_ENV)
     try:
         data = json.loads(r.stdout.decode("utf-8", errors="replace"))
         res = data.get("structured_output")
@@ -578,8 +602,30 @@ def studio_save(subject: str, kind: str, scope: str, title: str, markdown: str) 
     return path.relative_to(STUDIO).as_posix()
 
 
-# ───────────────────────── 과목 삭제 (휴지통으로 옮기기) ─────────────────────────
-TRASH = ROOT / "휴지통"
+# ───────────────────────── 삭제 = Windows 휴지통으로 ─────────────────────────
+def recycle(paths: list[Path]) -> None:
+    """파일·폴더를 Windows 휴지통으로 보낸다 (휴지통에서 '복원'하면 원래 자리로 돌아감).
+    Windows 셸 API(SHFileOperationW + FOF_ALLOWUNDO)를 써서 추가 설치가 필요 없다."""
+    import ctypes
+    from ctypes import wintypes
+
+    paths = [p for p in paths if p.exists()]
+    if not paths:
+        return
+
+    class SHFILEOPSTRUCTW(ctypes.Structure):
+        _fields_ = [("hwnd", wintypes.HWND), ("wFunc", wintypes.UINT), ("pFrom", wintypes.LPCWSTR),
+                    ("pTo", wintypes.LPCWSTR), ("fFlags", ctypes.c_ushort), ("fAnyOperationsAborted", wintypes.BOOL),
+                    ("hNameMappings", ctypes.c_void_p), ("lpszProgressTitle", wintypes.LPCWSTR)]
+
+    FO_DELETE, FOF_SILENT, FOF_NOCONFIRMATION, FOF_ALLOWUNDO, FOF_NOERRORUI = 3, 0x4, 0x10, 0x40, 0x400
+    # 여러 경로는 \0 으로 잇고 끝은 \0\0 (API 규칙)
+    buf = ctypes.create_unicode_buffer("\0".join(str(p.resolve()) for p in paths) + "\0")
+    op = SHFILEOPSTRUCTW(None, FO_DELETE, ctypes.cast(buf, wintypes.LPCWSTR), None,
+                         FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI, False, None, None)
+    rc = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(op))
+    if rc != 0 or op.fAnyOperationsAborted or any(p.exists() for p in paths):
+        raise ValueError(f"휴지통으로 옮기지 못했어요 (코드 {rc}). 탐색기나 다른 프로그램에서 파일이 열려 있으면 닫고 다시 해주세요.")
 
 
 def subject_dirs(name: str) -> dict[str, Path]:
@@ -597,30 +643,72 @@ def subject_summary(name: str) -> dict:
 
 
 def subject_delete(name: str) -> dict:
-    """과목을 통째로 휴지통/<시각>_<과목>/ 으로 옮긴다. 영구 삭제하지 않는다."""
+    """과목을 Windows 휴지통으로 보낸다: 강의자료·추출 텍스트·스튜디오 자료·시험 스타일, 그리고 복습 카드 백업.
+    쪽 이미지 캐시는 언제든 다시 만들 수 있어서 바로 지운다."""
     if not (MATERIALS / name).exists() and not any(c["subject"] == name for c in srs.load()):
         raise ValueError(f"없는 과목이에요: {name}")
-    summary = subject_dirs(name)
-    dest = TRASH / f"{time.strftime('%Y%m%d-%H%M%S')}_{name}"
-    dest.mkdir(parents=True, exist_ok=True)
-    moved = []
-    try:
-        for key, src in summary.items():  # 자료 폴더부터 옮긴다 (탐색기에서 열려 있으면 여기서 실패 → 아무것도 안 바뀜)
-            if src.exists():
-                shutil.move(str(src), str(dest / key))
-                moved.append(key)
-    except OSError as exc:
-        for key in reversed(moved):  # 일부만 옮겨졌으면 되돌린다
-            shutil.move(str(dest / key), str(summary[key]))
-        shutil.rmtree(dest, ignore_errors=True)
-        raise ValueError(f"옮기지 못했어요. 탐색기에서 이 과목 폴더나 파일이 열려 있으면 닫고 다시 해주세요. ({exc})")
+    d = subject_dirs(name)
     with srs_lock:
         cards = srs.load()
         gone = [c for c in cards if c["subject"] == name]
+        backup = None
+        if gone:  # 카드 백업을 자료 폴더 안에 두면 폴더를 복원할 때 같이 돌아온다
+            d["materials"].mkdir(parents=True, exist_ok=True)
+            backup = d["materials"] / f"{name} 복습카드 백업.json"
+            backup.write_text(json.dumps(gone, ensure_ascii=False, indent=1), encoding="utf-8")
+        try:
+            recycle([d["materials"], d["texts"], d["studio"], STYLES / f"{name}.json", STYLES / f"{name}.note.txt"])
+        except ValueError:
+            if backup and backup.exists():
+                backup.unlink()
+            raise
         if gone:
-            (dest / "cards.json").write_text(json.dumps(gone, ensure_ascii=False, indent=1), encoding="utf-8")
             srs.save([c for c in cards if c["subject"] != name])
-    return {"ok": True, "trash": dest.relative_to(ROOT).as_posix(), "cards": len(gone)}
+    for key in ("cache_hd", "cache_pages"):
+        shutil.rmtree(d[key], ignore_errors=True)
+    return {"ok": True, "cards": len(gone)}
+
+
+def with_context(message: str, context: list[dict]) -> str:
+    """이어가기가 안 될 때, 화면에 저장돼 있던 최근 대화를 새 대화 앞에 붙인다 (메시지당 1,500자, 최근 12개)."""
+    lines = []
+    for m in context[-12:]:
+        who = {"user": "학생", "bot": "튜터"}.get(m.get("role"))
+        if who and m.get("text"):
+            lines.append(f"[{who}] {str(m['text'])[:1500]}")
+    if not lines:
+        return message
+    return ("[앞선 대화 일부 — 앱에 저장된 기록. 이 맥락을 이어서 답한다]\n" + "\n\n".join(lines)
+            + "\n\n[이어지는 질문]\n" + message)
+
+
+# ───────────────────────── 자료 폴더 ↔ 추출 텍스트 맞추기 ─────────────────────────
+sync_lock = threading.Lock()
+
+
+def materials_out_of_sync() -> bool:
+    """탐색기로 직접 넣은 파일(추출 안 됨·원본이 더 새것)이나 지운 파일(추출본만 남음)이 있으면 True."""
+    for src in MATERIALS.rglob("*") if MATERIALS.exists() else []:
+        if src.suffix.lower() in ALLOWED_EXT:
+            md = TEXTS / src.relative_to(MATERIALS).with_suffix(".md")
+            # 탐색기로 복사한 파일은 수정 시각이 옛날 그대로라, 복사된 시각(ctime)도 함께 본다
+            st = src.stat()
+            if not md.exists() or md.stat().st_mtime < max(st.st_mtime, st.st_ctime):
+                return True
+    for md in TEXTS.rglob("*.md") if TEXTS.exists() else []:
+        rel = md.relative_to(TEXTS)
+        if not any((MATERIALS / rel).with_suffix(ext).exists() for ext in ALLOWED_EXT):
+            return True
+    return False
+
+
+def sync_materials() -> bool:
+    """자료와 추출 텍스트가 어긋나 있으면 extract.py로 맞춘다 (새 파일 추출 + 지운 파일의 추출본 정리). 바뀌었으면 True."""
+    with sync_lock:
+        if not materials_out_of_sync():
+            return False
+        run_tool("extract.py")
+        return True
 
 
 def stop_claude() -> None:
@@ -628,6 +716,27 @@ def stop_claude() -> None:
         proc = current_proc
     if proc and proc.poll() is None:
         # claude가 띄운 하위 프로세스까지 함께 종료
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, creationflags=NO_WINDOW)
+
+
+# ───────────────────────── iClass 자료 받기 (tools/iclass.py) ─────────────────────────
+iclass_lock = threading.Lock()
+iclass_proc: subprocess.Popen | None = None
+
+
+def iclass_login(user: str, password: str) -> dict:
+    """비밀번호는 표준입력으로만 넘기고 저장하지 않는다. 성공하면 iclass.py가 로그인 쿠키만 data/에 저장."""
+    if not user.strip() or not password:
+        raise ValueError("학번과 비밀번호를 모두 넣어주세요")
+    r = subprocess.run([PYTHON, str(TOOLS / "iclass.py"), "login"], cwd=ROOT, input=f"{user.strip()}\n{password}\n",
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW, timeout=90)
+    out = (r.stdout + r.stderr).strip().splitlines()
+    return {"ok": r.returncode == 0, "message": out[-1] if out else "응답이 없어요"}
+
+
+def stop_iclass() -> None:
+    proc = iclass_proc
+    if proc and proc.poll() is None:
         subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, creationflags=NO_WINDOW)
 
 
@@ -747,7 +856,15 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if url.path == "/api/stop":
                 stop_claude()
+                stop_iclass()
                 return self._json({"ok": True})
+            if url.path == "/api/iclass/login":
+                data = json.loads(self._body())
+                r = iclass_login(str(data.get("user", "")), str(data.get("password", "")))
+                data.clear()  # 비밀번호를 메모리에 오래 두지 않는다
+                return self._json(r, 200 if r["ok"] else 401)
+            if url.path == "/api/iclass/sync":
+                return self._iclass_sync()
             if url.path == "/api/grade":
                 data = json.loads(self._body())
                 if data["button"] not in srs.BUTTONS:
@@ -760,7 +877,7 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/studio/generate":
                 return self._studio_generate()
             if url.path == "/api/studio/delete":
-                studio_path(json.loads(self._body())["path"]).unlink()
+                recycle([studio_path(json.loads(self._body())["path"])])
                 return self._json({"ok": True})
             if url.path == "/api/quiz/grade":
                 data = json.loads(self._body())
@@ -801,9 +918,7 @@ class Handler(BaseHTTPRequestHandler):
                 p.write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
                 return self._json({"ok": True, "title": rec["title"]})
             if url.path == "/api/chats/delete":
-                p = chat_path(json.loads(self._body())["id"])
-                if p.exists():
-                    p.unlink()
+                recycle([chat_path(json.loads(self._body())["id"])])
                 return self._json({"ok": True})
             if url.path == "/api/subject/order":
                 save_order(json.loads(self._body())["order"])
@@ -834,7 +949,9 @@ class Handler(BaseHTTPRequestHandler):
                 dest = MATERIALS / subject / fname
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(self._body())
-                return self._json({"ok": True, "log": run_tool("extract.py", subject)})
+                with sync_lock:  # 백그라운드 맞추기와 동시에 같은 파일을 추출하지 않게
+                    log = run_tool("extract.py", subject)
+                return self._json({"ok": True, "log": log})
         except (ValueError, KeyError, json.JSONDecodeError) as exc:
             return self._json({"error": str(exc)}, 400)
         self._json({"error": "not found"}, 404)
@@ -868,12 +985,63 @@ class Handler(BaseHTTPRequestHandler):
                 stop_claude()
         return send
 
+    def _iclass_sync(self):
+        """iclass.py sync를 돌리며 한 줄씩 보낸다. 끝나면 받은 자료를 텍스트로 추출.
+        이벤트: line(진행) / need_login(로그인 필요) / result(받은 결과) / error / done"""
+        global iclass_proc
+        subjects = [safe_name(s) for s in json.loads(self._body() or b"{}").get("subjects", [])]
+        if not iclass_lock.acquire(blocking=False):
+            return self._json({"error": "iClass에서 이미 받는 중이에요"}, 409)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            send = self._sender()
+            got, subj, blocked = {}, None, []
+            try:
+                iclass_proc = subprocess.Popen([PYTHON, str(TOOLS / "iclass.py"), "sync", *subjects], cwd=ROOT,
+                                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                               encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+                for raw in iclass_proc.stdout:
+                    line = raw.rstrip()
+                    if not line:
+                        continue
+                    if m := re.match(r"^\[(.+?)\] ", line):
+                        subj = m.group(1)
+                    elif line.startswith("  + ") and subj:
+                        got.setdefault(subj, []).append(line[4:])
+                    elif line.startswith("  ! ") and subj:
+                        blocked.append(f"{subj}: {line[4:].split(' (')[0]}")
+                    send({"type": "line", "text": line})
+                code = iclass_proc.wait()
+                if code == 3:
+                    send({"type": "need_login"})
+                elif code != 0:
+                    send({"type": "error", "message": "iClass에서 받다가 문제가 생겼어요 (위 기록 참고)"})
+                else:
+                    if got:
+                        send({"type": "line", "text": "받은 자료를 읽는 중 (텍스트 추출)…"})
+                        with sync_lock:
+                            run_tool("extract.py")
+                    send({"type": "result", "got": got, "blocked": blocked})
+            except Exception as exc:
+                send({"type": "error", "message": f"iClass 받기 실패: {exc}"})
+            finally:
+                iclass_proc = None
+            send({"type": "done"})
+        finally:
+            iclass_lock.release()
+        self.close_connection = True
+
     def _quiz_generate(self):
         data = json.loads(self._body())
         subject = safe_name(data["subject"])
         n = max(1, min(int(data.get("n", 10)), 20))
         if not self._stream_start():
             return
+        sync_materials()
         send = self._sender()
         result = {}
         extra = ["--json-schema", json.dumps(QUIZ_SCHEMA)]
@@ -923,6 +1091,7 @@ class Handler(BaseHTTPRequestHandler):
         scope = (data.get("scope") or "").strip()
         if not self._stream_start():
             return
+        sync_materials()
         send = self._sender()
         result = {}
 
@@ -973,11 +1142,34 @@ class Handler(BaseHTTPRequestHandler):
                 alive = False
                 stop_claude()
 
+        sync_materials()  # 탐색기로 넣거나 지운 자료를 먼저 반영
+        session_id = data.get("session_id")
         try:
-            stream_claude(message, data.get("session_id"), send)
+            if not session_id:
+                stream_claude(message, None, send)
+            else:
+                # 이어가기: 폴더를 옮겼거나 Claude 쪽 대화가 사라졌으면 --resume이 실패한다.
+                # 실패를 바로 보여주지 않고, 화면에 저장된 최근 대화를 붙여서 새 대화로 다시 시작한다.
+                held, got_text, result = [], {"v": False}, {}
+
+                def guard(ev):
+                    if ev["type"] == "text":
+                        got_text["v"] = True
+                    if not got_text["v"] and ev["type"] in ("error", "done"):
+                        held.append(ev)
+                        return
+                    send(ev)
+                stream_claude(message, session_id, guard, on_result=result.update)
+                failed = not got_text["v"] and result.get("is_error") and "No conversation found" in str(result.get("errors") or result.get("result") or "")
+                if failed:
+                    send({"type": "tool", "label": "이전 대화를 이어갈 수 없어서 최근 내용을 붙여 새로 시작해요"})
+                    stream_claude(with_context(message, data.get("context") or []), None, send)
+                else:
+                    for ev in held:
+                        send(ev)
         except Exception as exc:
             send({"type": "error", "message": f"Claude 실행 실패: {exc}"})
-            send({"type": "done", "session_id": data.get("session_id")})
+            send({"type": "done", "session_id": session_id})
         self.close_connection = True
 
 

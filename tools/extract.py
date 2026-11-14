@@ -199,6 +199,7 @@ EXTRACTORS = {".pdf": extract_pdf, ".pptx": extract_pptx, ".docx": extract_docx}
 def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     force = "--force" in sys.argv
+    MATERIALS.mkdir(exist_ok=True)
     subjects = [MATERIALS / a for a in args] if args else sorted(p for p in MATERIALS.iterdir() if p.is_dir())
 
     done = skipped = 0
@@ -213,7 +214,8 @@ def main() -> None:
                     print(f"[미지원] {src.relative_to(MATERIALS)} → PDF로 변환해서 넣어주세요")
                 continue
             out = TEXTS / src.relative_to(MATERIALS).with_suffix(".md")
-            if not force and out.exists() and out.stat().st_mtime >= src.stat().st_mtime:
+            st = src.stat()  # 탐색기로 복사한 파일은 mtime이 옛날 그대로라 복사된 시각(ctime)도 본다
+            if not force and out.exists() and out.stat().st_mtime >= max(st.st_mtime, st.st_ctime):
                 skipped += 1
                 continue
             try:
@@ -228,7 +230,19 @@ def main() -> None:
             if parts and empty / len(parts) > 0.5:
                 warn = f"  ⚠ {empty}/{len(parts)}쪽에 글자가 거의 없음 (스캔본일 수 있음 → 원본 PDF를 직접 읽어야 함)"
             print(f"[추출] {src.relative_to(MATERIALS)} ({len(parts)}쪽){warn}")
-    print(f"완료: 새로 추출 {done}개, 변경 없음 {skipped}개")
+    # 원본이 지워진 추출본 정리 (탐색기로 자료를 지웠을 때 지운 자료가 계속 검색·인용되지 않게)
+    pruned = 0
+    for subject in (subjects if args else sorted(p for p in TEXTS.iterdir() if p.is_dir()) if TEXTS.exists() else []):
+        tdir = TEXTS / subject.name
+        for md in tdir.rglob("*.md") if tdir.exists() else []:
+            rel = md.relative_to(TEXTS)
+            if not any((MATERIALS / rel).with_suffix(ext).exists() for ext in EXTRACTORS):
+                md.unlink()
+                pruned += 1
+                print(f"[정리] {rel} (원본 없음)")
+        if tdir.exists() and not any(tdir.rglob("*")):
+            tdir.rmdir()
+    print(f"완료: 새로 추출 {done}개, 변경 없음 {skipped}개" + (f", 정리 {pruned}개" if pruned else ""))
 
 
 if __name__ == "__main__":
