@@ -218,6 +218,51 @@ a.cite { color: var(--ink-2); text-decoration: none; cursor: pointer; padding: 0
 a.cite:hover, a.cite.on { color: var(--ink); background: var(--hl); }
 .msg.user a.cite { color: inherit; }
 .bubble.md td a.cite { white-space: normal; word-break: keep-all; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* 출처는 평소 숨김: 헤더의 「출처 표시」를 켜거나(body.cites-on), 출처를 물어본 답변(.msg.cites-on)에서만 보인다 */
+.cites, .src.cite-src { display: none; }
+body.cites-on .cites, .cites-on .cites { display: inline; }
+body.cites-on .src.cite-src { display: block; }
+#citeBtn[aria-pressed="true"] { color: var(--hl); background: var(--hl-soft); }
+/* 드래그한 문장의 출처 팝업 */
+#citePop { position: fixed; z-index: 20; max-width: min(380px, calc(100vw - 32px)); background: var(--raised, var(--surface)); color: var(--ink);
+  border: 1px solid var(--rule-strong); border-radius: 10px; box-shadow: var(--float); padding: 8px; font-size: 13.5px; }
+#citePop[hidden] { display: none; }
+#citePop .cp-h { color: var(--muted); font-size: 12px; padding: 2px 6px 6px; }
+#citePop .cp-item { display: block; width: 100%; text-align: left; padding: 7px 8px; border-radius: 6px; color: var(--hl); background: transparent; border: 0; font: inherit; cursor: pointer; word-break: keep-all; }
+#citePop .cp-item:hover, #citePop .cp-item:focus-visible { background: var(--hl-soft); }
+#citePop .cp-none { padding: 4px 6px 6px; color: var(--ink-2); line-height: 1.55; }
+#citePop { z-index: 40; }
+#citePop .cp-ask { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 4px; padding: 8px; border: 0; border-top: 1px solid var(--rule); border-radius: 0 0 6px 6px;
+  background: transparent; color: var(--pen); font: 600 13.5px var(--sans); cursor: pointer; text-align: left; }
+#citePop .cp-ask:hover { background: var(--pen-soft); }
+#citePop .cp-ask svg { width: 16px; height: 16px; }
+/* 질문 창: 퀴즈·정리 자료를 보던 그대로 옆에 띄워 묻는 작은 창 (머리줄을 끌어 옮기고, 오른쪽 아래 모서리로 크기 조절) */
+#askWin { position: fixed; right: 24px; bottom: 24px; z-index: 25; width: 440px; height: min(620px, 78vh); min-width: 320px; min-height: 300px;
+  max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); resize: both; overflow: hidden;
+  display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 14px; box-shadow: var(--float); }
+#askWin[hidden] { display: none; }
+.aw-head { display: flex; align-items: center; gap: 6px; height: 46px; padding: 0 6px 0 14px; border-bottom: 1px solid var(--rule); cursor: move; user-select: none; flex-shrink: 0; color: var(--pen); }
+.aw-head svg { width: 18px; height: 18px; }
+.aw-title { font-weight: 650; font-size: 14px; color: var(--ink); }
+.aw-sub { flex: 1; min-width: 0; color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aw-head .icon-btn { cursor: pointer; }
+.aw-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.aw-quote { border-left: 3px solid var(--hl); background: var(--hl-soft); border-radius: 0 8px 8px 0; padding: 7px 10px; color: var(--ink-2); font-size: 13px; line-height: 1.55;
+  white-space: pre-wrap; max-height: 9.5em; overflow: auto; flex-shrink: 0; }
+.aw-quote small { display: block; color: var(--muted); font-size: 11.5px; margin-bottom: 2px; }
+.aw-user { align-self: flex-end; max-width: 85%; background: var(--pen-soft); color: var(--ink); border-radius: 12px 12px 4px 12px; padding: 7px 11px; white-space: pre-wrap; flex-shrink: 0; }
+.aw-bot { line-height: 1.65; flex-shrink: 0; }
+.aw-bot .tools { margin-bottom: 4px; }
+.aw-empty { color: var(--muted); font-size: 13px; text-align: center; margin: auto 0; line-height: 1.7; }
+.aw-foot { padding: 8px 10px 10px; border-top: 1px solid var(--rule); flex-shrink: 0; }
+.aw-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.aw-chips[hidden] { display: none; }
+.aw-chips button { height: 28px; padding: 0 10px; border-radius: 99px; border: 1px solid var(--rule-strong); background: transparent; color: var(--ink-2); font: 12.5px var(--sans); cursor: pointer; }
+.aw-chips button:hover { border-color: var(--pen); color: var(--ink); background: var(--pen-soft); }
+.aw-foot .box { padding: 6px 6px 6px 12px; border-radius: 12px; }
+.aw-foot textarea { max-height: 120px; padding: 6px 0; }
+.aw-foot .send { width: 32px; height: 32px; }
+@media (max-width: 700px) { #askWin { right: 8px; bottom: 8px; left: 8px; width: auto; } }
 
 /* ── 출처 보기 패널 ── */
 #viewer { width: min(42vw, 760px); min-width: 360px; flex-shrink: 0; border-left: 1px solid var(--rule); background: var(--surface); display: flex; flex-direction: column; }
@@ -228,16 +273,30 @@ a.cite:hover, a.cite.on { color: var(--ink); background: var(--hl); }
 .vw-ctrl span { min-width: 64px; text-align: center; }
 .vw-body { flex: 1; overflow: auto; padding: 18px; background: var(--bg); }
 .vw-img { display: block; width: 100%; height: auto; border-radius: 4px; box-shadow: 0 0 0 1px var(--rule), 0 4px 16px rgba(20,28,45,.08); background: #fff; cursor: zoom-in; }
-.vw-img.zoom { width: 180%; max-width: none; cursor: zoom-out; }
+.vw-img.fitp { width: auto; max-width: 100%; max-height: var(--vw-h, 80vh); margin: 0 auto; }
+.vw-img.zoomed { max-width: none; cursor: zoom-out; }
+.vw-text { font-size: calc(14px * var(--vw-font, 1)); }
+.vw-zoom { display: flex; align-items: center; margin-right: 2px; }
+.vw-zlabel { min-width: 58px; height: 30px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: 12.5px var(--sans); font-variant-numeric: tabular-nums; cursor: pointer; }
+.vw-zlabel:hover { background: var(--sunk); color: var(--ink); }
+#viewer:not(.big) .vw-fit { display: none; }  /* 옆 패널은 좁아서: 가운데 배율 글자를 누르면 폭/쪽 맞춤 전환 */
+/* 크게 보기: 화면 가운데 큰 창 + 어두운 배경 */
+#vwShade { position: fixed; inset: 0; z-index: 29; background: var(--backdrop, rgba(0,0,0,.55)); backdrop-filter: blur(3px); }
+#vwShade[hidden] { display: none; }
+#viewer.big { position: fixed; z-index: 30; inset: 3vh max(3vw, calc((100vw - 1240px) / 2)); width: auto; min-width: 0;
+  border: 1px solid var(--rule-strong); border-radius: 14px; overflow: hidden; box-shadow: var(--float); }
+#viewer.big .vw-body { padding: 22px 28px; }
+#viewer.big .vw-text, #viewer.big .vw-note, #viewer.big .vw-sec-title { max-width: 900px; margin-left: auto; margin-right: auto; }
 .vw-msg { color: var(--muted); text-align: center; padding: 48px 10px; font-size: 14px; }
 .vw-note { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
 .vw-sec-title { font-weight: 700; margin-bottom: 8px; font-size: 14.5px; }
 .vw-sec-title.sub { font-weight: 600; color: var(--muted); font-size: 13px; margin: 18px 0 6px; }
 .vw-text { background: var(--surface); border-radius: 8px; padding: 14px 16px; font-size: 14px; box-shadow: 0 0 0 1px var(--rule); }
 .vw-text.vw-target { box-shadow: 0 0 0 2px var(--hl-strong); }
-@media (max-width: 1180px) { body.viewing > #side { display: none; } }  /* 넓은 화면에선 사이드바(자료 목록)를 남겨둔다 */
+@media (max-width: 1180px) { body.viewing:not(.vw-big) > #side { display: none; } }  /* 넓은 화면에선 사이드바(자료 목록)를 남겨둔다 */
 @media (max-width: 1000px) {
-  #viewer { position: fixed; inset: 0 0 0 auto; width: min(100vw, 620px); min-width: 0; z-index: 5; box-shadow: var(--float); }
+  #viewer.big { inset: 8px; }
+  #viewer:not(.big) { position: fixed; inset: 0 0 0 auto; width: min(100vw, 620px); min-width: 0; z-index: 5; box-shadow: var(--float); }
 }
 
 /* ── 전체 화면 모드 공통 (복습·퀴즈·스튜디오) ── */
@@ -619,6 +678,7 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
     <div class="title"><span id="curName"></span><span id="curMeta"></span></div>
     <select id="subjSelect" title="과목"></select>
     <button class="icon-btn theme-btn theme-m" id="themeBtnM"></button>
+    <button class="btn ghost" id="citeBtn" aria-pressed="false"><span data-i="doc"></span><span class="lbl">출처 표시</span></button>
     <button class="btn ghost" data-act="ingest" title="선택한 과목의 자료를 요약해요"><span data-i="list"></span><span class="lbl">자료 요약</span></button>
     <button class="btn ghost" data-act="weak" title="자주 틀린 주제를 다시 정리해요"><span data-i="target"></span><span class="lbl">약점 분석</span></button>
     <button class="btn ghost" data-act="new" title="대화 기록을 지우고 새로 시작해요"><span data-i="plus"></span><span class="lbl">새 대화</span></button>
@@ -671,10 +731,11 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
       <textarea id="input" rows="1" placeholder="강의 내용에 대해 물어보세요"></textarea>
       <button class="send" id="sendBtn" title="보내기 (Enter)"></button>
     </div>
-    <div class="hint">Enter로 보내고 Shift+Enter로 줄을 바꿔요. 답변에는 강의자료 출처가 민트색으로 표시돼요.</div>
+    <div class="hint">Enter로 보내고 Shift+Enter로 줄을 바꿔요. 문장을 드래그하면 참조한 강의자료가 떠요.</div>
   </div></div>
 </main>
 
+<div id="vwShade" hidden></div>
 <aside id="viewer" hidden>
   <div class="vw-head">
     <div class="vw-title" id="vwTitle"></div>
@@ -683,6 +744,14 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
       <span id="vwPage"></span>
       <button class="icon-btn" id="vwNext" title="다음 (→)"><span data-i="chevR"></span></button>
     </div>
+    <div class="vw-zoom">
+      <button class="icon-btn" id="vwOut" title="축소 (−)"><span data-i="minus"></span></button>
+      <button class="vw-zlabel" id="vwZ" title="폭 맞춤 ↔ 쪽 전체 보기 (0)"></button>
+      <button class="icon-btn" id="vwIn" title="확대 (+) · Ctrl+휠로도 돼요"><span data-i="plus"></span></button>
+    </div>
+    <button class="icon-btn vw-fit" id="vwFitW" title="폭에 맞추기 (0)"><span data-i="fitW"></span></button>
+    <button class="icon-btn vw-fit" id="vwFitP" title="한 쪽 전체 보기 (9)"><span data-i="fitP"></span></button>
+    <button class="icon-btn" id="vwMode"></button>
     <button class="btn" id="vwOpen" title="PC의 기본 프로그램으로 원본 열기" style="height:32px;font-size:13px">원본 열기</button>
     <button class="icon-btn" id="vwClose" title="닫기 (Esc)"><span data-i="close"></span></button>
   </div>
@@ -705,6 +774,19 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
   </form>
 </dialog>
 <div id="printArea"></div>
+<div id="citePop" hidden></div>
+<section id="askWin" hidden aria-label="질문 창">
+  <div class="aw-head" id="awHead" title="끌어서 옮길 수 있어요">
+    <span data-i="ask"></span><span class="aw-title">질문 창</span><span class="aw-sub" id="awSub"></span>
+    <button class="icon-btn" id="awNew" title="새로 묻기 (이 창의 대화 지우기)"><span data-i="plus"></span></button>
+    <button class="icon-btn" id="awClose" title="닫기 (Esc)"><span data-i="close"></span></button>
+  </div>
+  <div class="aw-body" id="awBody"></div>
+  <div class="aw-foot">
+    <div class="aw-chips" id="awChips" hidden></div>
+    <div class="box"><textarea id="awInput" rows="1" placeholder="이 부분에서 궁금한 걸 물어보세요"></textarea><button class="send" id="awSend" title="보내기 (Enter)"></button></div>
+  </div>
+</section>
 
 <dialog id="askDlg">
   <form method="dialog">
@@ -810,6 +892,10 @@ const ICONS = {
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".6"/><circle cx="4.5" cy="12" r=".6"/><circle cx="4.5" cy="18" r=".6"/>',
   target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  fitW: '<path d="M3.5 12h17M7 8.5L3.5 12 7 15.5M17 8.5l3.5 3.5-3.5 3.5"/>',
+  fitP: '<rect x="6.5" y="3.5" width="11" height="17" rx="1.5"/><path d="M9.5 8h5M9.5 11h5M9.5 14h3"/>',
+  expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
   chevL: '<path d="M15 6l-6 6 6 6"/>',
@@ -957,13 +1043,33 @@ function linkCites(html) {
       const a = document.createElement("a");
       const full = text.substr(h.i, h.len);
       a.className = "cite"; a.href = "#"; a.textContent = shortCite(full, name);
-      a.dataset.name = name; a.dataset.page = h.page; a.dataset.hint = h.hint;
+      a.dataset.name = name; a.dataset.page = h.page; a.dataset.hint = h.hint; a.dataset.full = h.name ? full : `${name} ${full}`;
       a.title = `${full}\n눌러서 원본 보기`;
       parts.push(a); pos = h.i + h.len;
     }
     if (!parts.length) continue;
     parts.push(document.createTextNode(text.slice(pos)));
     node.replaceWith(...parts);
+  }
+  // 연달아 붙은 출처 「 (A.pdf p.1, B.pdf p.2)」는 앞 공백·괄호까지 한 묶음(span.cites)으로 만든다.
+  // 평소엔 묶음째 숨기고(출처 표시를 켰을 때만 보임), 문장을 드래그하면 팝업으로 알려준다
+  for (const a of tpl.content.querySelectorAll("a.cite")) {
+    if (a.parentElement?.closest(".cites")) continue;
+    const take = [a]; let n = a.nextSibling;
+    while (n && n.nodeType === 3 && /^[\s,;，·]*$/.test(n.nodeValue) && n.nextSibling?.matches?.("a.cite")) { take.push(n, n.nextSibling); n = n.nextSibling.nextSibling; }
+    const g = document.createElement("span"); g.className = "cites"; a.before(g);
+    const prev = g.previousSibling, next = take.at(-1).nextSibling;
+    const open = prev?.nodeType === 3 && prev.nodeValue.match(/\s*[(（\[]\s*(?:출처\s*[:：]?\s*)?$/);
+    const close = next?.nodeType === 3 && next.nodeValue.match(/^[\s,~\-–\dp.쪽]*[)）\]]/i);
+    if (open && close) {
+      prev.nodeValue = prev.nodeValue.slice(0, prev.nodeValue.length - open[0].length);
+      next.nodeValue = next.nodeValue.slice(close[0].length);
+      g.append(open[0], ...take, close[0]);
+    } else {
+      const lead = prev?.nodeType === 3 && !g.parentElement?.matches(".src") && prev.nodeValue.match(/[ \t]+$/);
+      if (lead) prev.nodeValue = prev.nodeValue.slice(0, -lead[0].length);
+      g.append(lead ? lead[0] : "", ...take);
+    }
   }
   return tpl.innerHTML;
 }
@@ -972,7 +1078,7 @@ function linkCites(html) {
 let vw = null; // { info, page, hint }
 async function openViewer(name, page, hint) {
   const panel = $("#viewer");
-  panel.hidden = false; document.body.classList.add("viewing");
+  panel.hidden = false; document.body.classList.add("viewing"); applyVwMode();
   $("#vwTitle").textContent = name; $("#vwBody").innerHTML = '<div class="vw-msg typing">불러오는 중</div>';
   $("#vwPage").textContent = ""; $("#vwPrev").disabled = $("#vwNext").disabled = true;
   try {
@@ -990,12 +1096,13 @@ async function showViewerPage() {
   if (info.kind === "pdf") {
     $("#vwPage").textContent = `${vw.page} / ${info.count}쪽`;
     const img = new Image(); img.className = "vw-img"; img.alt = `${info.name} ${vw.page}쪽`;
-    img.title = "클릭해서 확대하거나 축소해요";
-    img.onclick = () => img.classList.toggle("zoom");
+    img.title = "클릭해서 크게 보거나 다시 맞춰요 · Ctrl+휠로 확대·축소";
+    img.onclick = () => setVwZoom(vwZoom === "width" || vwZoom === "page" ? 2 : "width");
     img.onerror = () => body.innerHTML = '<div class="vw-msg">이 쪽을 불러오지 못했어요. 원본 열기로 확인해 주세요.</div>';
     img.src = `/api/page?path=${encodeURIComponent(info.path)}&page=${vw.page}`;
     body.innerHTML = '<div class="vw-msg typing vw-loading">쪽을 그리는 중</div>'; body.append(img);
     img.onload = () => body.querySelector(".vw-loading")?.remove();
+    applyVwZoom();
   } else {
     body.innerHTML = '<div class="vw-msg typing">불러오는 중</div>';
     try {
@@ -1007,11 +1114,56 @@ async function showViewerPage() {
         <div class="vw-sec-title">${esc(r.title)}</div><div class="bubble md vw-text vw-target">${md(r.text)}</div>
         ${(r.more || []).map(s => `<div class="vw-sec-title sub">${esc(s.title)}</div><div class="bubble md vw-text">${md(s.text)}</div>`).join("")}`;
     } catch (e) { body.innerHTML = `<div class="vw-msg">${esc(e.message)}</div>`; }
+    applyVwZoom();
   }
   body.scrollTop = 0;
   $("#vwPrev").disabled = vw.page <= 1; $("#vwNext").disabled = vw.page >= info.count;
 }
-function closeViewer() { vw = null; $("#viewer").hidden = true; document.body.classList.remove("viewing"); markOpenFile(); }
+function closeViewer() {
+  vw = null; $("#viewer").hidden = true; $("#vwShade").hidden = true;
+  document.body.classList.remove("viewing", "vw-big"); markOpenFile();
+}
+
+/* 크게 보기(가운데 큰 창, 기본) ↔ 옆에 두기(오른쪽 패널) — 마지막 선택을 기억 */
+let vwBig = store.get("vwBig", true);
+function applyVwMode() {
+  $("#viewer").classList.toggle("big", vwBig);
+  $("#vwShade").hidden = !vwBig || $("#viewer").hidden;
+  document.body.classList.toggle("vw-big", vwBig && !$("#viewer").hidden);
+  const b = $("#vwMode");
+  b.innerHTML = icon(vwBig ? "panel" : "expand");
+  b.title = vwBig ? "옆에 두고 답변과 나란히 보기" : "가운데 크게 보기";
+  applyVwZoom();
+}
+/* 배율: "width"(폭 맞춤) · "page"(한 쪽 전체) · 숫자(폭 맞춤 대비 배율) — 쪽을 넘겨도 유지 */
+let vwZoom = store.get("vwZoom", "width");
+function applyVwZoom() {
+  const body = $("#vwBody"), img = body.querySelector(".vw-img");
+  const z = typeof vwZoom === "number" ? vwZoom : 1;
+  $("#vwZ").textContent = vwZoom === "width" ? "폭 맞춤" : vwZoom === "page" ? "쪽 전체" : `${Math.round(vwZoom * 100)}%`;
+  body.style.setProperty("--vw-font", z);
+  body.style.setProperty("--vw-h", `${body.clientHeight - 40}px`);
+  if (img) {
+    img.classList.toggle("fitp", vwZoom === "page");
+    img.classList.toggle("zoomed", z > 1);
+    img.style.width = vwZoom === "page" ? "" : `${z * 100}%`;
+  }
+}
+function setVwZoom(z) {
+  if (typeof z === "number") z = Math.round(Math.min(4, Math.max(.5, z)) * 100) / 100;
+  if (z === 1) z = "width";
+  const body = $("#vwBody");
+  const rx = body.scrollLeft / Math.max(1, body.scrollWidth - body.clientWidth), ry = body.scrollTop / Math.max(1, body.scrollHeight - body.clientHeight);
+  vwZoom = z; store.set("vwZoom", z); applyVwZoom();
+  body.scrollLeft = rx * (body.scrollWidth - body.clientWidth); body.scrollTop = ry * (body.scrollHeight - body.clientHeight); // 보던 위치 유지
+}
+function stepVwZoom(dir) {
+  let cur = typeof vwZoom === "number" ? vwZoom : 1;
+  const img = $("#vwBody .vw-img");
+  if (vwZoom === "page" && img) cur = img.offsetWidth / Math.max(1, $("#vwBody").clientWidth - 2 * parseFloat(getComputedStyle($("#vwBody")).paddingLeft));
+  setVwZoom(dir > 0 ? cur * 1.25 : cur / 1.25);
+}
+window.addEventListener("resize", () => { if (!$("#viewer").hidden) applyVwZoom(); });
 function stepViewer(d) { if (vw && vw.page + d >= 1 && vw.page + d <= vw.info.count) { vw.page += d; showViewerPage(); } }
 
 /* ── 사이드바 ── */
@@ -1233,8 +1385,10 @@ $("#delDlg").addEventListener("close", async () => {
 $("#openAll").onclick =() => api(current ? `/api/open?subject=${encodeURIComponent(current)}` : "/api/open", { method: "POST" });
 
 /* ── 대화 ── */
-function bubble(role, text) {
-  const m = document.createElement("div"); m.className = "msg " + role;
+// 질문에서 출처를 직접 물어봤으면 그 답변만 출처를 보여준다
+const CITE_ASK_RE = /출처|근거\s*(?:자료|페이지|쪽)|몇\s*(?:쪽|페이지|슬라이드)|어느\s*(?:자료|강의|슬라이드|페이지)|어디(?:에|서)\s*(?:나와|있)/;
+function bubble(role, text, cites) {
+  const m = document.createElement("div"); m.className = "msg " + role + (cites ? " cites-on" : "");
   const b = document.createElement("div"); b.className = "bubble" + (role === "bot" ? " md" : "");
   if (role === "bot") b.innerHTML = md(text); else b.textContent = text;
   m.append(b); $("#msgs").append(m); return b;
@@ -1251,7 +1405,7 @@ function renderHistory() {
       </ol></div>`;
     return;
   }
-  for (const h of history) h.role === "notice" ? notice(h.text) : bubble(h.role, h.text);
+  for (const h of history) h.role === "notice" ? notice(h.text) : bubble(h.role, h.text, h.cites);
   scrollDown(true);
 }
 function notice(text) { const d = document.createElement("div"); d.className = "notice"; d.textContent = text; $("#msgs").append(d); }
@@ -1276,7 +1430,8 @@ async function send(message, shown) {
   if (hv) closeHistory();
   if (!history.length) $("#msgs").innerHTML = "";
   history.push({ role: "user", text: shown ?? message }); bubble("user", shown ?? message);
-  const holder = document.createElement("div"); holder.className = "msg bot";
+  const wantCites = CITE_ASK_RE.test(shown ?? message);
+  const holder = document.createElement("div"); holder.className = "msg bot" + (wantCites ? " cites-on" : "");
   const inner = document.createElement("div"); inner.className = "bubble md";
   const tools = document.createElement("div"); tools.className = "tools";
   const body = document.createElement("div");
@@ -1313,7 +1468,7 @@ async function send(message, shown) {
   typing.remove(); paint();
   if (!tools.children.length) tools.remove();
   if (!text && !errored) body.innerHTML = '<span class="typing" style="animation:none">(멈췄어요)</span>';
-  history.push({ role: "bot", text: text || (errored ? "(오류)" : "(멈췄어요)") });
+  history.push({ role: "bot", text: text || (errored ? "(오류)" : "(멈췄어요)"), ...(wantCites ? { cites: true } : {}) });
   store.set("history", history.slice(-200));
   saveChat();
   setBusy(false); loadState();
@@ -2036,7 +2191,7 @@ function renderQuiz() {
     if (q.missing?.length && q.verdict !== "correct") body += `<div class="miss">${q.missing.map(m => `<span>${esc(m)}</span>`).join("")}</div>`;
     if (q.type === "short") body += `<div class="part model"><b>모범답안</b><div class="bubble md">${md(q.answer)}</div></div>`;
     body += `<div class="part"><b>해설</b><div class="bubble md">${md(q.explanation)}</div></div>
-      <div class="src">출처 ${linkCites(esc(q.source))}</div>`;
+      <div class="src cite-src">출처 ${linkCites(esc(q.source))}</div>`;
   }
   stage.innerHTML = `<div class="sheet">${body}</div>`;
 
@@ -2309,7 +2464,7 @@ function renderReviewRecord() {
         <div class="tags"><span class="tag">${esc(it.subject)}</span>${it.topic ? `<span class="tag">${esc(it.topic)}</span>` : ""}<span class="tag">내가 매긴 것: ${RV_LABEL[it.button]}</span>${it.interval ? `<span class="tag">다음 복습 ${fmtDays(it.interval)}</span>` : ""}</div>
         <div class="q-text bubble md">${md(it.question)}</div>
         <div class="answer-sec bubble md">${md(it.answer)}</div>
-        <div class="src">출처 ${linkCites(esc(it.source))}</div></div>`;
+        <div class="src cite-src">출처 ${linkCites(esc(it.source))}</div></div>`;
     $("#rvActions").hidden = false;
     $("#rvActions").innerHTML = `<div class="row"><span class="grow">${rl.peek + 1} / ${items.length}</span>
       ${rl.peek > 0 ? '<button class="btn" id="rdPrev">이전 카드</button>' : ""}
@@ -2370,7 +2525,7 @@ function renderReview() {
         ${card.lapses ? `<span class="tag">${card.lapses}번 틀림</span>` : ""}</div>
       <div class="q-text bubble md">${md(card.question)}</div>
       ${rv.revealed ? `<div class="answer-sec bubble md">${md(card.answer)}</div>
-        <div class="src">출처 ${linkCites(esc(card.source))}${card.note ? ` · ${esc(card.note)}` : ""}</div>
+        <div class="src cite-src">출처 ${linkCites(esc(card.source))}${card.note ? ` · ${esc(card.note)}` : ""}</div>
         <div id="rvExplain"></div>` : ""}
     </div>
     ${rv.revealed ? `<div class="sub-links"><button class="btn ghost" id="rvWhy">${icon("ask", 16)}이 개념 설명 듣기</button>${rv.practice ? "" : `<button class="btn ghost danger" id="rvDel">${icon("trash", 16)}카드 삭제</button>`}</div>` : ""}`;
@@ -2530,13 +2685,225 @@ document.addEventListener("keydown", e => {
   if ($("#viewer").hidden || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
   if (e.key === "Escape" && !document.querySelector("dialog[open]")) { e.preventDefault(); e.stopImmediatePropagation(); return closeViewer(); } // 복습 중이어도 패널부터 닫기
   if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;  // 입력 중엔 ←/→ 양보
+  if (e.key === "+" || e.key === "=") { e.preventDefault(); return stepVwZoom(1); }
+  if (e.key === "-") { e.preventDefault(); return stepVwZoom(-1); }
+  if (e.key === "0") { e.preventDefault(); return setVwZoom("width"); }
+  if (e.key === "9") { e.preventDefault(); return setVwZoom("page"); }
   if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); stepViewer(-1); }
   else if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); stepViewer(1); }
 }, true);
 $("#vwClose").onclick = closeViewer;
+$("#vwShade").onclick = closeViewer;
+$("#vwMode").onclick = () => { vwBig = !vwBig; store.set("vwBig", vwBig); applyVwMode(); };
+$("#vwIn").onclick = () => stepVwZoom(1);
+$("#vwOut").onclick = () => stepVwZoom(-1);
+$("#vwZ").onclick = () => setVwZoom(vwZoom === "width" ? "page" : "width");
+$("#vwFitW").onclick = () => setVwZoom("width");
+$("#vwFitP").onclick = () => setVwZoom("page");
+$("#vwBody").addEventListener("wheel", e => { if (e.ctrlKey) { e.preventDefault(); stepVwZoom(e.deltaY < 0 ? 1 : -1); } }, { passive: false });
 $("#vwPrev").onclick = () => stepViewer(-1);
 $("#vwNext").onclick = () => stepViewer(1);
 $("#vwOpen").onclick = () => vw && api(`/api/open-file?path=${encodeURIComponent(vw.info.path)}`, { method: "POST" }).catch(e => toast(e.message));
+
+/* ── 출처 표시 켜기/끄기 (기본은 꺼짐) ── */
+function setCites(on) {
+  document.body.classList.toggle("cites-on", on);
+  const b = $("#citeBtn"); b.setAttribute("aria-pressed", String(on));
+  b.title = on ? "출처를 다시 숨겨요" : "답변·퀴즈·정리 자료에 출처를 항상 보여줘요 (꺼져 있어도 문장을 드래그하면 볼 수 있어요)";
+  store.set("citesOn", on);
+}
+setCites(store.get("citesOn", false));
+$("#citeBtn").onclick = () => setCites(!document.body.classList.contains("cites-on"));
+
+/* ── 문장을 드래그하면 그 부분이 참조한 출처를 팝업으로, 누르면 바로 원본으로 ── */
+const CITE_SCOPE = "#msgs .msg.bot, #stStage, #qzStage, #rvStage, #askWin .aw-bot";
+const CITE_BLOCK = "p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, .q-text, .choice, .src";
+const elOf = n => n?.nodeType === 1 ? n : n?.parentElement;
+function citesForRange(range, scope) {
+  const all = [...scope.querySelectorAll("a.cite")];
+  const found = new Set(all.filter(a => range.intersectsNode(a)));  // 선택 안에 들어 있는 출처
+  const blocks = new Set([...scope.querySelectorAll(CITE_BLOCK)].filter(b => range.intersectsNode(b)));
+  for (const n of [range.startContainer, range.endContainer]) { const b = elOf(n)?.closest(CITE_BLOCK); if (b && scope.contains(b)) blocks.add(b); }
+  for (const b of blocks) {
+    const own = all.filter(a => a.closest(CITE_BLOCK) === b);
+    if (!own.length && /^T[DH]$/.test(b.tagName)) { b.closest("tr")?.querySelectorAll("a.cite").forEach(a => found.add(a)); continue; } // 표: 같은 행의 출처 칸
+    // 출처는 문장 끝에 붙으므로, 선택이 끝난 뒤 같은 문단에서 처음 나오는 출처 묶음이 그 문장의 출처
+    const after = own.find(a => range.comparePoint(a, 0) > 0);
+    if (after) (after.closest(".cites")?.querySelectorAll("a.cite") ?? [after]).forEach(a => found.add(a));
+  }
+  if (!found.size) {  // 퀴즈·복습 문제: 문제 아래 "출처" 줄
+    for (let e = elOf(range.commonAncestorContainer); e && scope.contains(e); e = e.parentElement) {
+      const s = e.querySelectorAll(".src a.cite"); if (s.length) { s.forEach(a => found.add(a)); break; }
+    }
+  }
+  const seen = new Set();
+  return all.filter(a => found.has(a)).filter(a => { const k = `${a.dataset.name}|${a.dataset.page}|${a.dataset.hint}`; return !seen.has(k) && seen.add(k); });
+}
+const citePop = $("#citePop");
+function hideCitePop() { citePop.hidden = true; }
+function showCitePop() {
+  const sel = getSelection();
+  if (!sel.rangeCount || sel.isCollapsed || !sel.toString().trim()) return hideCitePop();
+  const range = sel.getRangeAt(0);
+  const scope = elOf(range.commonAncestorContainer)?.closest(CITE_SCOPE);
+  if (!scope || elOf(range.commonAncestorContainer).closest("#viewer, input, textarea")) return hideCitePop();
+  const cites = citesForRange(range, scope);
+  citePop.innerHTML = cites.length
+    ? `<div class="cp-h">이 부분이 참조한 강의자료 · 눌러서 원본 보기</div>` +
+      cites.map((a, i) => `<button class="cp-item" data-i="${i}">${esc(a.dataset.full || a.textContent)}</button>`).join("")
+    : `<div class="cp-none">이 부분엔 출처가 달려 있지 않아요. 강의자료에 없는 보충 설명일 수 있어요.</div>`;
+  citePop.insertAdjacentHTML("beforeend", `<button class="cp-ask">${icon("ask")}이 부분 물어보기</button>`);
+  const picked = askPick(range, scope, sel.toString(), cites);
+  citePop.querySelector(".cp-ask").onclick = () => { hideCitePop(); getSelection().removeAllRanges(); openAsk(picked); };
+  citePop.querySelectorAll(".cp-item").forEach(btn => btn.onclick = () => {
+    const a = cites[+btn.dataset.i];
+    document.querySelectorAll("a.cite.on").forEach(x => x.classList.remove("on")); a.classList.add("on");
+    hideCitePop(); openViewer(a.dataset.name, a.dataset.page, a.dataset.hint);
+  });
+  citePop.hidden = false;
+  const rects = range.getClientRects(), r = rects[rects.length - 1] || range.getBoundingClientRect();
+  const w = citePop.offsetWidth, h = citePop.offsetHeight;
+  const left = Math.min(Math.max(16, r.right - w / 2), innerWidth - w - 16);
+  const top = r.bottom + 8 + h > innerHeight - 8 ? Math.max(8, range.getBoundingClientRect().top - h - 8) : r.bottom + 8;
+  citePop.style.left = left + "px"; citePop.style.top = top + "px";
+}
+citePop.addEventListener("mousedown", e => e.preventDefault());  // 팝업을 눌러도 선택이 풀리지 않게
+document.addEventListener("mouseup", e => { if (!citePop.contains(e.target)) setTimeout(showCitePop, 0); });
+document.addEventListener("keyup", e => { if (e.shiftKey && e.key.startsWith("Arrow")) showCitePop(); });
+document.addEventListener("selectionchange", () => { if (getSelection().isCollapsed) hideCitePop(); });
+document.addEventListener("scroll", hideCitePop, true);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !citePop.hidden) hideCitePop(); });
+
+/* ── 질문 창: 드래그한 부분을 붙여서, 보던 화면(퀴즈·정리 자료)을 떠나지 않고 묻는다 ── */
+// 서버의 따로 된 실행 칸(ask)을 써서 질문하기 화면의 답변과 서로 기다리지 않는다. 이 창의 대화는 「새로 묻기」를 누를 때까지 이어진다
+let aw = { session: null, quote: null, busy: false, items: 0 };
+const AW_WHERE = { stStage: "정리 자료", qzStage: "퀴즈", rvStage: "복습 카드", msgs: "답변", askWin: "질문 창 답변" };
+const AW_CHIPS = ["쉽게 설명해줘", "예시를 들어줘", "왜 그런지 알려줘", "시험엔 어떻게 나와?"];
+function askPick(range, scope, text, cites) {
+  const area = scope.closest("#stStage, #qzStage, #rvStage, #msgs, #askWin");
+  const where = AW_WHERE[area?.id] || "화면";
+  const anc = elOf(range.commonAncestorContainer);
+  const block = anc.closest(CITE_BLOCK);
+  const parts = [];
+  const doc = area?.querySelector("#stDoc");  // 정리 자료: 이 부분이 속한 소제목
+  if (doc && block) {
+    const hs = [...doc.querySelectorAll("h2, h3")].filter(h => h.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING);
+    if (hs.length) parts.push(`소제목: ${hs.at(-1).textContent.trim()}`);
+  }
+  const qt = anc.closest(".sheet")?.querySelector(".q-text");  // 퀴즈·복습: 문제 전체
+  if (qt && !qt.contains(range.commonAncestorContainer)) parts.push(`문제: ${qt.textContent.replace(/\s+/g, " ").trim()}`);
+  const bt = block?.textContent.replace(/\s+/g, " ").trim();
+  if (bt && bt !== text.replace(/\s+/g, " ").trim()) parts.push(`주변 문장: ${bt}`);
+  const id = area?.id;
+  const subject = (id === "stStage" && st?.subject) || (id === "qzStage" && qz?.cfg?.subject) || current;
+  return { text: text.trim().slice(0, 1500), where, context: parts.join("\n").slice(0, 1200), subject,
+           solving: id === "qzStage" && !!qz && qz.phase === "answer",
+           cites: cites.map(a => a.dataset.full || a.textContent) };
+}
+function awScroll() { const b = $("#awBody"); b.scrollTop = b.scrollHeight; }
+function awRender() {
+  if (!aw.items && !aw.quote) $("#awBody").innerHTML = '<div class="aw-empty">퀴즈·정리 자료·답변에서 문장을 드래그하고<br>「이 부분 물어보기」를 누르면 여기서 물어볼 수 있어요.</div>';
+  $("#awSub").textContent = aw.quote ? `${aw.quote.where}에서` : "";
+}
+function openAsk(picked) {
+  $("#askWin").hidden = false;
+  if (!aw.items) $("#awBody").innerHTML = "";
+  $("#awBody").querySelector(".aw-quote.pending")?.remove();  // 아직 안 보낸 인용은 새 인용으로 바꾼다
+  aw.quote = picked;
+  const q = document.createElement("div"); q.className = "aw-quote pending";
+  q.innerHTML = `<small>${esc(picked.where)}에서 고른 부분</small>`; q.append(picked.text);
+  $("#awBody").append(q);
+  $("#awChips").innerHTML = AW_CHIPS.map(c => `<button type="button">${esc(c)}</button>`).join("");
+  $("#awChips").querySelectorAll("button").forEach(btn => btn.onclick = () => askSend(btn.textContent));
+  $("#awChips").hidden = false;
+  awRender(); awScroll(); $("#awInput").focus();
+}
+function closeAsk() { $("#askWin").hidden = true; }
+function resetAsk() {
+  if (aw.busy) api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "ask" }) });
+  aw = { session: null, quote: null, busy: false, items: 0 };
+  $("#awChips").hidden = true; awRender(); $("#awInput").focus();
+}
+function askMessage(q) {
+  const quote = aw.quote, subject = quote?.subject || current;
+  let m = subject ? `[현재 과목: ${subject}]\n` : "";
+  if (!quote) return m + q;
+  m += `[질문 창 — 학생이 ${quote.where}에서 드래그한 부분에 대해 묻는다. 답은 핵심 위주로 짧게(10줄 안팎).]\n`;
+  m += `드래그한 부분: «${quote.text}»\n`;
+  if (quote.context) m += `${quote.context}\n`;
+  if (quote.cites.length) m += `이 부분의 출처: ${quote.cites.join(", ")}\n`;
+  if (quote.solving) m += "학생은 아직 이 문제를 푸는 중이다. 정답이나 정답 보기를 직접 말하지 말고 개념 설명과 힌트로만 돕는다. 학생이 답을 달라고 하면 그때 알려준다.\n";
+  return m + `질문: ${q}`;
+}
+async function askSend(text) {
+  const q = (text ?? $("#awInput").value).trim();
+  if (!q || aw.busy) return;
+  const inp = $("#awInput"); inp.value = ""; inp.style.height = "auto";
+  const message = askMessage(q);
+  const body = $("#awBody");
+  if (!aw.items && !aw.quote) body.innerHTML = "";
+  body.querySelector(".aw-quote.pending")?.classList.remove("pending");
+  aw.quote = null; aw.items++; $("#awChips").hidden = true; awRender();
+  const u = document.createElement("div"); u.className = "aw-user"; u.textContent = q; body.append(u);
+  const bot = document.createElement("div"); bot.className = "aw-bot bubble md";
+  const tools = document.createElement("div"); tools.className = "tools";
+  const out = document.createElement("div");
+  const typing = document.createElement("div"); typing.className = "typing"; typing.textContent = "생각하는 중";
+  bot.append(tools, out, typing); body.append(bot); awScroll();
+  aw.busy = true; $("#awSend").innerHTML = icon("stop"); $("#awSend").title = "멈추기";
+  const mine = aw;  // 도중에 「새로 묻기」를 누르면 이 답변은 버린다
+  let acc = "", raf = 0;
+  const paint = () => { raf = 0; const stick = body.scrollHeight - body.scrollTop - body.clientHeight < 80; out.innerHTML = md(acc); if (stick) awScroll(); };
+  const err = msg => { const e = document.createElement("div"); e.className = "err"; e.textContent = msg; bot.append(e); };
+  try {
+    const res = await api("/api/chat", { method: "POST", stream: true, body: JSON.stringify({ message, session_id: aw.session, slot: "ask" }) });
+    if (!res.ok) { let m = res.statusText; try { m = (await res.json()).error; } catch {} throw new Error(m); }
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 1);
+        if (!line.trim()) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "text") { acc += ev.delta; typing.textContent = "쓰는 중"; if (!raf) raf = requestAnimationFrame(paint); }
+        else if (ev.type === "tool") { const t = document.createElement("span"); t.className = "tool"; t.textContent = ev.label; tools.append(t); typing.textContent = ev.label; }
+        else if ((ev.type === "session" || ev.type === "done") && ev.session_id && mine === aw) aw.session = ev.session_id;
+        else if (ev.type === "error") err(ev.message);
+      }
+    }
+  } catch (e) { err("답을 받지 못했어요: " + e.message); }
+  if (mine !== aw) return;
+  typing.remove(); paint(); if (!tools.children.length) tools.remove();
+  if (!acc && !bot.querySelector(".err")) out.innerHTML = '<span class="typing" style="animation:none">(멈췄어요)</span>';
+  aw.busy = false; $("#awSend").innerHTML = icon("send"); $("#awSend").title = "보내기 (Enter)";
+  if (!$("#askWin").hidden) $("#awInput").focus();
+}
+$("#awSend").innerHTML = icon("send");
+$("#awSend").onclick = () => aw.busy ? api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "ask" }) }) : askSend();
+$("#awClose").onclick = closeAsk;
+$("#awNew").onclick = () => { resetAsk(); $("#awSend").innerHTML = icon("send"); };
+$("#awInput").addEventListener("input", e => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; });
+$("#awInput").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); askSend(); } });
+// 질문 창 안에서 누른 키는 뒤 화면(퀴즈 단축키·Esc로 나가기)에 넘기지 않는다
+$("#askWin").addEventListener("keydown", e => {
+  if (e.key === "Escape" && !e.isComposing) { e.preventDefault(); closeAsk(); }
+  e.stopPropagation();
+});
+// 머리줄을 끌어서 옮기기
+$("#awHead").addEventListener("pointerdown", e => {
+  if (e.target.closest("button")) return;
+  const win = $("#askWin"), r = win.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+  win.style.right = win.style.bottom = "auto"; win.style.left = r.left + "px"; win.style.top = r.top + "px";
+  const move = ev => {
+    win.style.left = Math.min(Math.max(0, ev.clientX - dx), innerWidth - 80) + "px";
+    win.style.top = Math.min(Math.max(0, ev.clientY - dy), innerHeight - 46) + "px";
+  };
+  const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); };
+  addEventListener("pointermove", move); addEventListener("pointerup", up);
+});
+awRender();
+
 
 renderHistory(); loadState(); updateNav(); input.focus();
 </script>

@@ -334,13 +334,13 @@ def source_info(name: str, subject: str | None) -> dict:
 def render_page(rel: str, page: int) -> bytes:
     import pymupdf
     src = material_path(rel)
-    out = CACHE_HD / src.relative_to(MATERIALS).parent / f"{src.stem}_p{page}.png"
+    out = CACHE_HD / src.relative_to(MATERIALS).parent / f"{src.stem}_p{page}@220.png"
     if not out.exists() or out.stat().st_mtime < src.stat().st_mtime:
         with pymupdf.open(src) as doc:
             if not 1 <= page <= len(doc):
                 raise ValueError(f"{page}쪽이 없어요 (전체 {len(doc)}쪽)")
             out.parent.mkdir(parents=True, exist_ok=True)
-            doc[page - 1].get_pixmap(dpi=160).save(out)
+            doc[page - 1].get_pixmap(dpi=220).save(out)
     return out.read_bytes()
 
 
@@ -965,7 +965,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": True})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return
-            if url.path == "/api/stop":  # kind: chat(질문 답변 + iClass 받기) / quiz / studio / 없으면 전부
+            if url.path == "/api/stop":  # kind: chat(질문 답변 + iClass 받기) / ask(질문 창) / quiz / studio / 없으면 전부
                 kind = (json.loads(self._body() or b"{}") or {}).get("kind")
                 stop_claude(kind)
                 if kind in (None, "chat"):
@@ -1246,7 +1246,9 @@ class Handler(BaseHTTPRequestHandler):
         message = (data.get("message") or "").strip()
         if not message:
             return self._json({"error": "빈 메시지"}, 400)
-        if is_busy("chat"):
+        # slot: chat(질문하기 화면) / ask(퀴즈·정리 자료에서 드래그해 여는 질문 창) — 서로 기다리지 않게 칸을 나눈다
+        slot = "ask" if data.get("slot") == "ask" else "chat"
+        if is_busy(slot):
             return self._json({"error": "이전 답변이 아직 진행 중이에요"}, 409)
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
@@ -1266,13 +1268,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.flush()
             except OSError:  # 화면이 닫힘 → 진행 중인 작업도 중단
                 alive = False
-                stop_claude("chat")
+                stop_claude(slot)
 
         sync_materials()  # 탐색기로 넣거나 지운 자료를 먼저 반영
         session_id = data.get("session_id")
         try:
             if not session_id:
-                stream_claude(message, None, send)
+                stream_claude(message, None, send, slot=slot)
             else:
                 # 이어가기: 폴더를 옮겼거나 Claude 쪽 대화가 사라졌으면 --resume이 실패한다.
                 # 실패를 바로 보여주지 않고, 화면에 저장된 최근 대화를 붙여서 새 대화로 다시 시작한다.
@@ -1285,11 +1287,11 @@ class Handler(BaseHTTPRequestHandler):
                         held.append(ev)
                         return
                     send(ev)
-                stream_claude(message, session_id, guard, on_result=result.update)
+                stream_claude(message, session_id, guard, on_result=result.update, slot=slot)
                 failed = not got_text["v"] and result.get("is_error") and "No conversation found" in str(result.get("errors") or result.get("result") or "")
                 if failed:
                     send({"type": "tool", "label": "이전 대화를 이어갈 수 없어서 최근 내용을 붙여 새로 시작해요"})
-                    stream_claude(with_context(message, data.get("context") or []), None, send)
+                    stream_claude(with_context(message, data.get("context") or []), None, send, slot=slot)
                 else:
                     for ev in held:
                         send(ev)
