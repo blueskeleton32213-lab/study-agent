@@ -7,7 +7,8 @@
       "Skill",
       "Bash(python tools/extract.py:*)",
       "Bash(python tools/srs.py:*)",
-      "Bash(python tools/render.py:*)"
+      "Bash(python tools/render.py:*)",
+      "Bash(python tools/digest.py:*)"
     ],
     "deny": [
       "PowerShell"
