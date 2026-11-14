@@ -440,6 +440,17 @@ main.histing #chat, main.histing .composer { display: none; }
 .chat-row:hover .ops, .chat-row:focus-within .ops { opacity: 1; }
 .chat-row:hover .when { visibility: hidden; }
 .chat-row .ops .icon-btn.del:hover { color: var(--red); background: var(--red-soft); }
+/* 퀴즈 기록 */
+#qzHead[hidden], #qzSp[hidden], #qzNewTop[hidden], #qzProg[hidden], #rvHead[hidden], #rvSp[hidden], #rvProg[hidden] { display: none; }
+.rv-due { display: flex; align-items: center; gap: 14px; padding: 16px 18px; margin-bottom: 26px; border: 1px solid var(--rule-strong); border-radius: 12px; background: var(--surface); }
+.rv-due .tx { flex: 1; min-width: 0; }
+.rv-due .tx b { display: block; font-size: 16px; }
+.rv-due .tx span { color: var(--muted); font-size: 13px; }
+.chat-row .when .mini { display: inline-flex; width: 64px; height: 6px; border-radius: 99px; overflow: hidden; background: var(--rule); vertical-align: 1px; margin-right: 8px; }
+.chat-row .when .mini i { display: block; height: 100%; }
+.mark-row .ic.rate { width: auto; min-width: 44px; font-size: 12px; font-weight: 650; border-radius: 4px; padding: 2px 6px; text-align: center; color: #fff; }
+.chat-row .when .sc { font-weight: 700; color: var(--ink); }
+.chat-row .when .go { color: var(--hl); font-weight: 600; }
 
 /* 사이드바 접기 */
 #side { transition: width .18s ease; overflow: hidden; }
@@ -635,7 +646,10 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
   <section id="quizv" hidden>
     <div class="mode-top">
       <button class="icon-btn" id="qzExit" title="그만하기 (Esc)"></button>
-      <div class="prog"><div id="qzBar"></div></div>
+      <span class="st-top-title" id="qzHead" hidden>퀴즈 기록</span>
+      <span class="st-sp" id="qzSp" hidden></span>
+      <button class="btn primary" id="qzNewTop" hidden style="height:34px;font-size:13.5px"><span data-i="plus"></span>새 퀴즈</button>
+      <div class="prog" id="qzProg"><div id="qzBar"></div></div>
       <span class="mode-left" id="qzLeft"></span>
     </div>
     <div class="stage" id="qzStage"></div>
@@ -644,7 +658,9 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
   <section id="review" hidden>
     <div class="mode-top">
       <button class="icon-btn" id="rvExit" title="복습 그만하기 (Esc)"></button>
-      <div class="prog"><div id="rvBar"></div></div>
+      <span class="st-top-title" id="rvHead" hidden>복습 기록</span>
+      <span class="st-sp" id="rvSp" hidden></span>
+      <div class="prog" id="rvProg"><div id="rvBar"></div></div>
       <span class="mode-left" id="rvLeft"></span>
     </div>
     <div class="stage" id="rvStage"></div>
@@ -1254,8 +1270,8 @@ function setBusy(v) {
 
 async function send(message, shown) {
   if (busy || !message.trim()) return;
-  if (rv) closeReview();
-  if (qz) closeQuiz();
+  if (rv || rl) closeReview();
+  if (qz || ql) closeQuiz();
   if (st) closeStudio();
   if (hv) closeHistory();
   if (!history.length) $("#msgs").innerHTML = "";
@@ -1337,8 +1353,8 @@ function iclassLogin(reason) {
 
 async function iclassSync(subjects = [], shown = null) {
   if (busy) return toast("다른 작업이 끝난 뒤에 받을 수 있어요");
-  if (rv) closeReview();
-  if (qz) closeQuiz();
+  if (rv || rl) closeReview();
+  if (qz || ql) closeQuiz();
   if (st) closeStudio();
   if (hv) closeHistory();
   if (!history.length) $("#msgs").innerHTML = "";
@@ -1416,8 +1432,8 @@ const scope = () => current ? ` ${current}` : "";
 document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
   const a = b.dataset.act;
   if (a === "chat") {
-    if (rv) closeReview();
-    if (qz) closeQuiz();
+    if (rv || rl) closeReview();
+    if (qz || ql) closeQuiz();
     if (st) closeStudio();
     if (hv) closeHistory();
     return $("#input").focus();
@@ -1425,11 +1441,11 @@ document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
   if (a === "new") {
     if (busy) return toast("답변이 끝난 뒤에 눌러주세요");
     // 스튜디오·퀴즈·복습 화면에 있어도 대화 화면으로 돌아와서 새로 시작
-    if (rv) closeReview();
-    if (qz) closeQuiz();
+    if (rv || rl) closeReview();
+    if (qz || ql) closeQuiz();
     if (st) closeStudio();
     if (hv) closeHistory();
-    if (rv || quizShown() || st || hv) return;  // 닫기를 취소한 경우(예: 만드는 중 확인 창에서 취소)
+    if (rv || quizShown() || studioShown() || hv) return;  // 닫기를 취소한 경우(예: 만드는 중 확인 창에서 취소)
     history = []; sessionId = null; chatId = null; store.set("history", []); store.set("session", null); store.set("chatId", null); renderHistory();
     return $("#input").focus();
   }
@@ -1470,10 +1486,16 @@ const ST_TYPES = {
 };
 let st = null; // { view: home|gen|doc, subject, kind, docs, doc, tools, t0, timer }
 
+function studioShown() { return !!st && !$("#studiov").hidden; }
 function openStudio() {
-  if (rv) closeReview();
-  if (qz) closeQuiz();
+  if (rv || rl) closeReview();
+  if (qz || ql) closeQuiz();
   if (hv) closeHistory();
+  if (st) {  // 뒤에서 만들던(또는 다 만든) 스튜디오로 돌아가기
+    $("main").classList.add("studio"); $("#studiov").hidden = false;
+    if (document.activeElement) document.activeElement.blur();
+    return renderStudio();
+  }
   const subs = state.subjects.filter(s => s.files.length);
   if (!subs.length) return toast("먼저 과목을 만들고 자료를 넣어주세요");
   const subject = subs.some(s => s.name === current) ? current : subs[0].name;
@@ -1484,12 +1506,16 @@ function openStudio() {
   if (document.activeElement) document.activeElement.blur();
   loadStudio();
 }
-function closeStudio() {
-  if (st?.view === "gen") {
+function closeStudio(cancel = false) {
+  if (st?.view === "gen" && !st.err && !cancel) {  // 만드는 중에 다른 화면으로 가면 멈추지 않고 뒤에서 계속 만든다
+    $("main").classList.remove("studio"); $("#studiov").hidden = true;
+    return;
+  }
+  if (st?.view === "gen" && !st.err) {
     ask({ title: "만들기를 취소할까요?", desc: "아직 자료를 만드는 중이에요. 취소하면 지금까지 한 작업은 저장되지 않아요.",
           ok: "만들기 취소", cancel: "계속 만들기", danger: true }).then(yes => {
       if (!yes || st?.view !== "gen") return;
-      api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "job" }) }).catch(() => {});
+      api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "studio" }) }).catch(() => {});
       if (st?.timer) clearInterval(st.timer);
       st = null; $("main").classList.remove("studio"); $("#studiov").hidden = true;
     });
@@ -1535,7 +1561,7 @@ function renderStudio() {
       <p>${st.err ? "" : `${esc(st.subject)}의 ${esc(st.scope || "전체 범위")} 자료를 빠짐없이 읽고 있어요. <span class="st-time">${elapsed(st.t0)}</span> 지났어요.`}</p>
       ${st.err ? `<div class="err" style="text-align:left">${esc(st.err)}</div>` : `<div class="tools">${st.tools.slice(-8).map(x => `<span class="tool">${esc(x)}</span>`).join("")}</div>`}
       <div class="row">${st.err ? '<button class="btn" id="stBack">목록으로</button>' : '<button class="btn" id="stCancel">취소</button>'}</div></div></div>`;
-    const c = $("#stCancel"); if (c) c.onclick = closeStudio;
+    const c = $("#stCancel"); if (c) c.onclick = () => closeStudio(true);
     const b = $("#stBack"); if (b) b.onclick = () => { st.view = "home"; st.err = null; loadStudio(); };
   } else if (st.view === "doc") {
     const d = st.doc;
@@ -1561,7 +1587,6 @@ async function openDoc(d) {
   if (st?.view === "doc") renderStudio();
 }
 function askStudio(kind) {
-  if (busy) return toast("다른 작업이 끝난 뒤에 만들 수 있어요");
   const t = ST_TYPES[kind];
   $("#stDlgTitle").textContent = t.name;
   $("#stDlgDesc").textContent = `${st.subject} — ${t.desc}`;
@@ -1581,7 +1606,7 @@ $("#stDlg").addEventListener("close", () => {
 async function generateStudio(kind, scope, custom) {
   Object.assign(st, { view: "gen", kind, scope, tools: [], err: null, t0: Date.now() });
   st.timer = setInterval(() => { const el = document.querySelector(".st-time"); if (el && st) el.textContent = elapsed(st.t0); }, 1000);
-  renderStudio(); setBusy(true);
+  renderStudio();  // 따로 돌아가서, 만드는 동안 질문하거나 퀴즈를 만들 수 있다
   const me = st; let saved = null;
   try {
     const res = await api("/api/studio/generate", { method: "POST", stream: true, body: JSON.stringify({ subject: st.subject, kind, scope, custom }) });
@@ -1599,19 +1624,20 @@ async function generateStudio(kind, scope, custom) {
       }
     }
   } catch (e) { me.err = e.message; }
-  clearInterval(me.timer); setBusy(false);
+  clearInterval(me.timer);
   if (st !== me) return;
+  if (!studioShown()) toast(saved ? "스튜디오 자료가 준비됐어요. 스튜디오 메뉴에서 볼 수 있어요" : "스튜디오 자료를 만들지 못했어요. 스튜디오 메뉴에서 확인해 주세요");
   if (saved) {
     const docs = (await (await api(`/api/studio?subject=${encodeURIComponent(me.subject)}`)).json()).docs;
     me.docs = docs;
     const d = docs.find(x => x.path === saved.path);
-    if (d) { toast("저장했어요"); return openDoc(d); }
+    if (d) { if (studioShown()) toast("저장했어요"); return openDoc(d); }
     me.view = "home"; return renderStudio();
   }
   me.err ||= "결과를 받지 못했어요. 범위를 좁혀서 다시 해보세요."; renderStudio();
 }
 document.addEventListener("keydown", e => {
-  if (!st || e.isComposing || document.querySelector("dialog[open]")) return;
+  if (!studioShown() || e.isComposing || document.querySelector("dialog[open]")) return;
   if (e.key === "Escape") { e.preventDefault(); $("#stExit").click(); }
 });
 
@@ -1626,10 +1652,10 @@ async function saveChat() {
   } catch (e) { toast("대화를 기록하지 못했어요: " + e.message); }
 }
 async function openHistory() {
-  if (rv) closeReview();
-  if (qz) closeQuiz();
+  if (rv || rl) closeReview();
+  if (qz || ql) closeQuiz();
   if (st) closeStudio();
-  if (rv || quizShown() || st) return;
+  if (rv || quizShown() || studioShown()) return;
   hv = { chats: [], q: "", subj: "" };  // subj: "" = 전체, null = 과목 없음
   $("#hvSearch").value = "";
   $("main").classList.add("histing"); $("#historyv").hidden = false;
@@ -1738,18 +1764,34 @@ if (history.length && !chatId) saveChat();  // 예전부터 브라우저에 남�
 let qz = null; // { cfg, qs, idx, phase: gen|answer|grading|feedback|error|done, saved, retry, tools, err }
 const VERDICT = { correct: ["✓", "정답"], partial: ["△", "부분 정답"], wrong: ["✗", "오답"] };
 const KEYS = ["A", "B", "C", "D"];
-const saveQuiz = () => store.set("quiz", qz && qz.phase !== "gen" && qz.phase !== "done" && !qz.peek ? { ...qz, phase: qz.phase === "grading" ? "answer" : qz.phase } : null);
+let ql = null; // 퀴즈 기록 목록 화면 { list, q, subj }
+// 퀴즈는 서버(data/quizzes)에 저장한다. 저장은 순서대로 하나씩 보내고, id는 보낼 때 읽어서 중복 생성을 막는다
+let quizSaving = Promise.resolve();
+function saveQuiz(me = qz) {
+  if (!me?.qs?.length || me.phase === "gen" || me.phase === "error") return;
+  const phase = me.peek ? "done" : me.phase === "grading" ? "answer" : me.phase;
+  const snap = JSON.parse(JSON.stringify({ cfg: me.cfg, qs: me.qs.map(({ gradeErr, ...q }) => q), idx: me.idx, phase,
+    retry: !!me.retry, styleUsed: !!me.styleUsed, saved: !!me.saved, savedCount: me.savedCount || 0 }));
+  quizSaving = quizSaving.then(async () => {
+    try {
+      const r = await (await api("/api/quizzes/save", { method: "POST", body: JSON.stringify({ ...snap, id: me.id || null }) })).json();
+      me.id = r.id; me.title = r.title;
+    } catch (e) { toast("퀴즈를 기록하지 못했어요: " + e.message); }
+  });
+}
+{ // 예전에 브라우저에만 남아 있던 풀던 퀴즈를 기록으로 옮겨둔다
+  const old = store.get("quiz", null);
+  if (old?.qs?.length) saveQuiz({ ...old, id: null });
+  store.set("quiz", null);
+}
 
 async function openQuizSetup() {
-  if (qz) { showQuizView(); return renderQuiz(); }  // 뒤에서 만들던(또는 다 만든) 퀴즈로 돌아가기
+  if (qz && !ql) { showQuizView(); return renderQuiz(); }  // 뒤에서 만들던(또는 풀던) 퀴즈로 돌아가기
+  return showQuizList();
+}
+function openQuizDialog() {
   if (busy) return toast("답변이 끝난 뒤에 시작할 수 있어요");
-  const saved = store.get("quiz", null);
-  if (saved?.qs?.length) {
-    const go = await ask({ title: "풀던 퀴즈가 있어요", desc: `${saved.cfg.subject} 퀴즈를 ${saved.qs.length}문제 중 ${saved.idx + 1}번까지 풀었어요. 이어서 풀까요?`,
-                           ok: "이어서 풀기", cancel: "새 퀴즈 만들기" });
-    if (go === null) return;
-    if (go) { qz = saved; showQuizView(); return renderQuiz(); }
-  }
+  if (qz?.phase === "gen") return toast("만들고 있는 퀴즈가 끝난 뒤에 새로 만들 수 있어요");
   const subs = state.subjects.filter(s => s.files.length);
   if (!subs.length) return toast("먼저 과목을 만들고 자료를 넣어주세요");
   const sel = $("#qSubj"); sel.innerHTML = "";
@@ -1800,35 +1842,121 @@ $("#qSubj").onchange = e => loadQuizStyle(e.target.value);
 $("#qStyle").onclick = e => { const b = e.target.closest("button"); if (b && !b.disabled) setQuizStyle(b.dataset.v); };
 $("#qNote").oninput = updateQuizStyleInfo;
 function showQuizView() {
-  if (rv) closeReview();
+  if (rv || rl) closeReview();
   if (st) closeStudio();
   if (hv) closeHistory();
   $("main").classList.add("quizzing"); $("#quizv").hidden = false;
   if (document.activeElement) document.activeElement.blur();
 }
-function quizShown() { return !!qz && !$("#quizv").hidden; }
+function quizShown() { return !!qz && !ql && !$("#quizv").hidden; }
+function setQuizTop(list) {
+  $("#qzHead").hidden = $("#qzSp").hidden = $("#qzNewTop").hidden = !list;
+  $("#qzProg").hidden = !!list;
+  $("#qzExit").title = list ? "닫기 (Esc)" : "퀴즈 기록으로 (Esc)";
+  if (list) $("#qzLeft").textContent = "";
+}
 function closeQuiz(cancel = false) {
+  ql = null;
   if (qz?.phase === "gen" && !cancel) {  // 출제 중에 다른 화면으로 가면 멈추지 않고 뒤에서 계속 만든다
     $("main").classList.remove("quizzing"); $("#quizv").hidden = true;
     return;
   }
-  if (qz?.phase === "gen") api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "job" }) }).catch(() => {});
+  if (qz?.phase === "gen") api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "quiz" }) }).catch(() => {});
   saveQuiz(); qz = null;
   $("main").classList.remove("quizzing"); $("#quizv").hidden = true;
   loadState();
 }
-async function exitQuiz() {
-  if (qz && !qz.peek && ["answer", "grading", "feedback"].includes(qz.phase) &&
-      !await ask({ title: "퀴즈를 그만둘까요?", desc: "푼 곳까지 저장돼요. 다음에 퀴즈를 열면 이어서 풀 수 있어요.", ok: "그만두기", cancel: "계속 풀기" })) return;
-  if (qz?.phase === "done") store.set("quiz", null);
-  closeQuiz();
+function exitQuiz() { showQuizList(); }  // 푼 곳까지 기록돼 있어서 확인 없이 목록으로
+
+/* 퀴즈 기록 목록: 만든 퀴즈가 대화 기록처럼 남고, 눌러서 이어 풀거나 결과·해설을 다시 본다 */
+async function showQuizList() {
+  if (qz && qz.phase !== "gen") { saveQuiz(); qz = null; }  // 만드는 중인 퀴즈는 뒤에서 계속
+  ql = ql || { list: null, subj: "" };
+  showQuizView(); setQuizTop(true);
+  $("#qzActions").innerHTML = ""; $("#qzActions").hidden = true;
+  if (!ql.list) $("#qzStage").innerHTML = '<div class="st-wrap"><div class="typing">불러오는 중</div></div>';
+  else renderQuizList();
+  await loadQuizList();
 }
+async function loadQuizList() {
+  if (!ql) return;
+  await quizSaving;  // 방금 저장한 내용이 목록에 보이게
+  try { ql.list = (await (await api("/api/quizzes")).json()).quizzes; }
+  catch (e) { ql.list = ql.list || []; toast(e.message); }
+  renderQuizList();
+}
+function renderQuizList() {
+  if (!ql || !ql.list) return;
+  const all = ql.list;
+  const count = new Map();
+  for (const r of all) count.set(r.subject ?? null, (count.get(r.subject ?? null) || 0) + 1);
+  const order = state.subjects.map(s => s.name);
+  const subs = [...count.keys()].sort((a, b) => (order.includes(a) ? order.indexOf(a) : 1e6) - (order.includes(b) ? order.indexOf(b) : 1e6) || String(a).localeCompare(String(b), "ko"));
+  if (ql.subj !== "" && !count.has(ql.subj)) ql.subj = "";
+  const chips = all.length && subs.length > 1 ? `<div class="chips" role="group" aria-label="과목으로 거르기">
+      <button class="chip-btn${ql.subj === "" ? " on" : ""}" data-s="">전체<span class="c">${all.length}</span></button>
+      ${subs.map((s, i) => `<button class="chip-btn${ql.subj === s ? " on" : ""}" data-k="${i}">${esc(s ?? "과목 없음")}<span class="c">${count.get(s)}</span></button>`).join("")}
+    </div>` : "";
+  const list = all.filter(r => ql.subj === "" || (r.subject ?? null) === ql.subj);
+  const groups = new Map();
+  for (const r of list) { const g = chatGroup(r.updated); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
+  const gen = qz?.phase === "gen" ? `<div class="chat-group"><div class="st-h">만드는 중</div><div class="chat-list">
+      <div class="chat-row" id="qlGen" role="button" tabindex="0" title="눌러서 진행 상황을 봐요">
+        <span class="ic">${icon("quiz")}</span>
+        <span class="tx"><b>${esc(qz.cfg.subject)} · ${esc(qz.cfg.scope || "전체 범위")}</b>${meta([qz.cfg.level + " 난이도", `${qz.cfg.n}문제`])}</span>
+        <span class="when"><span class="typing">만드는 중</span></span></div></div></div>` : "";
+  const status = r => r.done ? `<span class="sc">${Math.round(((r.correct + r.partial * 0.5) / (r.total || 1)) * 100)}점</span> · ${esc(chatWhen(r.updated))}`
+    : `<span class="go">${r.answered ? `${r.answered}/${r.total} 푸는 중` : "안 푼 퀴즈"}</span> · ${esc(chatWhen(r.updated))}`;
+  $("#qzStage").innerHTML = `<div class="st-wrap">${chips}${gen}${!all.length && !gen
+      ? '<div class="blank">아직 만든 퀴즈가 없어요. 오른쪽 위 <b>새 퀴즈</b>로 만들면 여기에 기록돼요.</div>'
+      : [...groups].map(([g, rs]) => `<div class="chat-group"><div class="st-h">${g}</div><div class="chat-list">${rs.map(r => `
+        <div class="chat-row" data-id="${r.id}" role="button" tabindex="0" title="${r.done ? "눌러서 결과와 해설을 다시 봐요" : "눌러서 이어 풀어요"}">
+          <span class="ic">${icon(r.retry ? "review" : "quiz")}</span>
+          <span class="tx"><b>${esc(r.title)}</b>${meta([r.subject, r.level && r.level + " 난이도", `${r.total}문제`, r.done && `${r.correct}개 맞힘`])}</span>
+          <span class="when">${status(r)}</span>
+          <span class="ops"><button class="icon-btn ren" title="제목 바꾸기" aria-label="제목 바꾸기">${icon("edit", 16)}</button><button class="icon-btn del" title="삭제" aria-label="삭제">${icon("trash", 16)}</button></span>
+        </div>`).join("")}</div></div>`).join("")}</div>`;
+  $("#qzStage").querySelectorAll(".chip-btn").forEach(b => b.onclick = () => { ql.subj = b.dataset.s === "" ? "" : subs[+b.dataset.k]; renderQuizList(); });
+  const g = $("#qlGen"); if (g) g.onclick = g.onkeydown = e => { if (e.type === "click" || e.key === "Enter") { ql = null; setQuizTop(false); renderQuiz(); } };
+  $("#qzStage").querySelectorAll(".chat-row[data-id]").forEach(row => {
+    const id = row.dataset.id;
+    row.onclick = () => openQuizRecord(id);
+    row.onkeydown = e => { if (e.key === "Enter" && e.target === row) openQuizRecord(id); };
+    row.querySelector(".del").onclick = e => { e.stopPropagation(); deleteQuizRecord(id); };
+    row.querySelector(".ren").onclick = e => { e.stopPropagation(); renameQuizRecord(id); };
+  });
+}
+async function openQuizRecord(id) {
+  let rec;
+  try { rec = await (await api(`/api/quizzes/get?id=${id}`)).json(); } catch (e) { return toast(e.message); }
+  if (!rec.qs?.length) return toast("문제가 없는 기록이에요");
+  if (!ql) return;  // 그사이 다른 화면으로 감
+  if (qz?.phase === "gen") toast("만들던 퀴즈는 뒤에서 계속 만들어요. 다 되면 퀴즈 기록에 생겨요", 3500);
+  qz = { ...rec, tools: [], peek: false };
+  if (qz.phase === "feedback" && !qz.qs[qz.idx]?.verdict) qz.phase = "answer";
+  ql = null; setQuizTop(false); renderQuiz(); $("#qzStage").scrollTop = 0;
+}
+async function deleteQuizRecord(id) {
+  const r = ql?.list.find(x => x.id === id);
+  if (!await ask({ title: "퀴즈 기록을 삭제할까요?", desc: `"${r?.title || "이 퀴즈"}" 기록을 컴퓨터 휴지통으로 옮겨요. 이미 만든 복습 카드는 그대로 남아요.`, ok: "삭제", danger: true })) return;
+  try { await api("/api/quizzes/delete", { method: "POST", body: JSON.stringify({ id }) }); } catch (e) { return toast(e.message); }
+  toast("퀴즈 기록을 삭제했어요");
+  loadQuizList();
+}
+async function renameQuizRecord(id) {
+  const r = ql?.list.find(x => x.id === id);
+  const title = await ask({ title: "퀴즈 제목 바꾸기", label: "제목", value: r?.title || "", ok: "바꾸기" });
+  if (!title) return;
+  try { await api("/api/quizzes/rename", { method: "POST", body: JSON.stringify({ id, title }) }); } catch (e) { return toast(e.message); }
+  loadQuizList();
+}
+$("#qzNewTop").onclick = openQuizDialog;
 
 async function startQuiz(cfg) {
   if (busy) return toast("답변이 끝난 뒤에 시작할 수 있어요");
-  store.set("quiz", null);
+  if (qz && qz.phase !== "gen") saveQuiz();
   qz = { cfg, qs: [], idx: 0, phase: "gen", saved: false, retry: false, tools: [], t0: Date.now() };
-  showQuizView(); renderQuiz();  // 출제는 따로 돌아가서, 만드는 동안 질문하기로 가도 계속 만든다
+  ql = null; showQuizView(); setQuizTop(false); renderQuiz();  // 출제는 따로 돌아가서, 만드는 동안 질문하기로 가도 계속 만든다
   const me = qz;
   try {
     const res = await api("/api/quiz/generate", { method: "POST", stream: true, body: JSON.stringify(cfg) });
@@ -1839,17 +1967,21 @@ async function startQuiz(cfg) {
       buf += dec.decode(value, { stream: true }); let i;
       while ((i = buf.indexOf("\n")) >= 0) {
         const ev = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1);
+        if (ev.type === "quiz") { me.qs = ev.questions.map(q => ({ ...q, user: null, verdict: null })); me.id = ev.id; me.title = ev.title; }
         if (qz !== me) continue;
-        if (ev.type === "tool") { me.tools.push(ev.label); renderQuiz(); }
-        else if (ev.type === "quiz") { me.qs = ev.questions.map(q => ({ ...q, user: null, verdict: null })); }
+        if (ev.type === "tool") { me.tools.push(ev.label); quizShown() ? renderQuiz() : null; }
         else if (ev.type === "style") me.styleUsed = ev.used;
         else if (ev.type === "error") me.err = ev.message;
       }
     }
   } catch (e) { me.err = e.message; }
-  if (qz !== me) return; // 취소됨
+  if (qz !== me) {  // 취소했거나, 만드는 동안 다른 퀴즈를 열었음 (문제는 서버가 이미 기록해 둠)
+    if (me.id) { toast("새 퀴즈가 준비돼서 퀴즈 기록에 저장했어요"); loadQuizList(); }
+    return;
+  }
   if (me.qs.length) { me.phase = "answer"; me.err = null; } else { me.phase = "error"; me.err ||= "문제를 받지 못했어요. 범위를 바꿔서 다시 해보세요."; }
-  saveQuiz(); renderQuiz();
+  if (ql) { if (me.qs.length) { qz = null; loadQuizList(); } else renderQuizList(); }  // 목록을 보던 중이면 목록에 바로 나타나게
+  else renderQuiz();
   if ($("#quizv").hidden) toast(me.qs.length ? "퀴즈 문제가 준비됐어요. 왼쪽 퀴즈 메뉴에서 풀 수 있어요" : "퀴즈를 만들지 못했어요. 퀴즈 메뉴에서 확인해 주세요");
 }
 
@@ -1875,7 +2007,10 @@ function renderQuiz() {
     actions.innerHTML = qz.phase === "gen"
       ? `<div class="row"><button class="btn" id="qzCancel">취소</button></div>`
       : `<div class="row"><button class="btn" id="qzCancel">닫기</button><button class="btn primary" id="qzRetryGen">다시 만들기</button></div>`;
-    $("#qzCancel").onclick = () => closeQuiz(true);
+    $("#qzCancel").onclick = () => {  // 취소·닫기 → 퀴즈 기록 목록으로
+      if (qz.phase === "gen") api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "quiz" }) }).catch(() => {});
+      qz = null; showQuizList();
+    };
     const r = $("#qzRetryGen"); if (r) r.onclick = () => startQuiz(qz.cfg);
     return;
   }
@@ -1957,14 +2092,14 @@ function nextQuestion() {
   if (qz?.phase !== "feedback") return;
   if (qz.peek) { qz.peek = false; qz.phase = "done"; return renderQuiz(); } // 결과 화면에서 해설 보던 중
   if (qz.idx < qz.qs.length - 1) { qz.idx++; qz.phase = "answer"; saveQuiz(); renderQuiz(); $("#qzStage").scrollTop = 0; return; }
-  qz.phase = "done"; store.set("quiz", null); renderQuiz(); saveWrongCards();
+  qz.phase = "done"; renderQuiz(); saveWrongCards();
 }
 async function saveWrongCards() {
   const me = qz;
-  if (me.saved || me.retry) return;
+  if (me.saved || me.retry) return saveQuiz(me);
   const wrong = me.qs.filter(q => q.verdict !== "correct");
   me.saved = true;
-  if (!wrong.length) return;
+  if (!wrong.length) return saveQuiz(me);
   const items = wrong.map(q => ({
     topic: q.topic, source: q.source,
     question: q.type === "mcq" ? `${q.question}\n\n${q.choices.map((c, i) => `${KEYS[i]}. ${c}`).join("\n")}` : q.question,
@@ -1974,6 +2109,7 @@ async function saveWrongCards() {
     await api("/api/quiz/save", { method: "POST", body: JSON.stringify({ subject: me.cfg.subject, items }) });
     me.savedCount = items.length;
   } catch (e) { me.saveErr = e.message; }
+  saveQuiz(me);
   if (qz === me) renderQuiz();
   loadState();
 }
@@ -2000,14 +2136,14 @@ function renderQuizDone() {
       ${weak.length ? `<button class="btn primary" id="qzRetry">${icon("review", 16)}틀린 문제 다시 풀기</button>` : ""}
       ${weak.length ? `<button class="btn" id="qzWeak">${icon("target", 16)}틀린 주제 정리</button>` : ""}
       <button class="btn" id="qzNew">${icon("quiz", 16)}새 퀴즈</button>
-      <button class="btn ghost" id="qzBack">닫기</button></div></div>`;
+      <button class="btn ghost" id="qzBack">퀴즈 기록</button></div></div>`;
   $("#qzActions").innerHTML = ""; $("#qzActions").hidden = true;
   $("#qzStage").querySelectorAll(".mark-row").forEach(b => b.onclick = () => { qz.idx = +b.dataset.i; qz.phase = "feedback"; qz.peek = true; renderQuiz(); $("#qzStage").scrollTop = 0; });
-  $("#qzBack").onclick = closeQuiz;
-  $("#qzNew").onclick = () => { closeQuiz(); openQuizSetup(); };
+  $("#qzBack").onclick = showQuizList;
+  $("#qzNew").onclick = openQuizDialog;
   const rt = $("#qzRetry"); if (rt) rt.onclick = () => {
     const again = qz.qs.filter(q => q.verdict !== "correct").map(q => ({ ...q, user: null, verdict: null, feedback: "", missing: [], draft: "", overridden: false }));
-    qz = { ...qz, qs: again, idx: 0, phase: "answer", retry: true };
+    qz = { ...qz, qs: again, idx: 0, phase: "answer", retry: true, id: null, title: null, peek: false };  // 다시 풀기는 따로 기록
     saveQuiz(); renderQuiz();
   };
   const wk = $("#qzWeak"); if (wk) wk.onclick = () => {
@@ -2027,7 +2163,11 @@ document.addEventListener("keydown", e => {
     if (i >= 0 && e.key.length === 1) { e.preventDefault(); answerMcq(i); }
   } else if (qz.phase === "feedback" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); nextQuestion(); }
 });
-$("#qzExit").onclick = exitQuiz;
+$("#qzExit").onclick = () => ql ? closeQuiz() : qz?.phase === "gen" ? showQuizList() : exitQuiz();
+document.addEventListener("keydown", e => {  // 퀴즈 기록 목록에서 Esc = 닫기
+  if (!ql || $("#quizv").hidden || e.isComposing || document.querySelector("dialog[open]")) return;
+  if (e.key === "Escape") { e.preventDefault(); closeQuiz(); }
+});
 
 /* ── 복습 카드 (Claude 없이 바로 처리) ── */
 const RV_BTNS = [
@@ -2036,7 +2176,9 @@ const RV_BTNS = [
   { key: "good", label: "좋음", hotkey: "3" },
   { key: "easy", label: "쉬움", hotkey: "4" },
 ];
-let rv = null; // { queue, total, done, revealed, counts, weak, scope }
+let rv = null; // { queue, total, done, revealed, counts, weak, scope, log, id, practice }
+let rl = null; // 복습 기록 화면 { list, subj, due, rec(열어 본 기록), peek }
+const RV_LABEL = Object.fromEntries(RV_BTNS.map(b => [b.key, b.label]));
 
 function fmtDays(d) {
   if (d <= 1) return "내일";
@@ -2045,23 +2187,172 @@ function fmtDays(d) {
   return `${(d / 365).toFixed(1).replace(/\.0$/, "")}년 뒤`;
 }
 
-async function openReview() {
-  if (busy) return toast("답변이 끝난 뒤에 시작할 수 있어요");
-  if (qz) closeQuiz();
+function showReviewView() {
+  if (qz || ql) closeQuiz();
   if (st) closeStudio();
   if (hv) closeHistory();
+  $("main").classList.add("reviewing"); $("#review").hidden = false;
+  if (document.activeElement) document.activeElement.blur(); // 입력창에 커서가 있으면 단축키가 안 먹음
+}
+function setReviewTop(list, title = "복습 기록") {
+  $("#rvHead").hidden = $("#rvSp").hidden = !list;
+  $("#rvHead").textContent = title;
+  $("#rvProg").hidden = !!list;
+  $("#rvExit").title = list ? "닫기 (Esc)" : "복습 기록으로 (Esc)";
+  if (list) $("#rvLeft").textContent = "";
+}
+// 복습 메뉴 → 복습 기록 목록 (맨 위에 오늘 복습할 카드, 아래에 지난 복습)
+function openReview() {
+  if (rv) { showReviewView(); return renderReview(); }
+  showReviewList();
+}
+async function startReview() {
+  if (busy) return toast("답변이 끝난 뒤에 시작할 수 있어요");
   let cards;
   try { cards = (await (await api(`/api/review${current ? `?subject=${encodeURIComponent(current)}` : ""}`)).json()).cards; }
   catch (e) { return toast("복습 카드를 불러오지 못했어요: " + e.message); }
   rv = { queue: cards.map(c => ({ card: c, repeat: false })), total: cards.length, done: 0, revealed: false,
-         counts: { again: 0, hard: 0, good: 0, easy: 0 }, weak: new Map(), scope: current };
-  $("main").classList.add("reviewing"); $("#review").hidden = false;
-  if (document.activeElement) document.activeElement.blur(); // 입력창에 커서가 있으면 단축키가 안 먹음
-  renderReview();
+         counts: { again: 0, hard: 0, good: 0, easy: 0 }, weak: new Map(), scope: current, log: [], id: null };
+  rl = null; showReviewView(); setReviewTop(false); renderReview();
 }
 function closeReview() {
-  rv = null; $("main").classList.remove("reviewing"); $("#review").hidden = true;
+  rv = null; rl = null; $("main").classList.remove("reviewing"); $("#review").hidden = true;
   loadState(); $("#input").focus();
+}
+// 매긴 카드마다 서버(data/reviews)에 기록. 순서대로 보내고 id는 보낼 때 읽는다
+let reviewSaving = Promise.resolve();
+function saveReview(me = rv) {
+  if (!me || me.practice || !me.log.length) return;
+  const snap = JSON.parse(JSON.stringify({ scope: me.scope, total: me.total, done: !me.queue.length, items: me.log }));
+  reviewSaving = reviewSaving.then(async () => {
+    try { me.id = (await (await api("/api/reviews/save", { method: "POST", body: JSON.stringify({ ...snap, id: me.id || null }) })).json()).id; }
+    catch (e) { toast("복습을 기록하지 못했어요: " + e.message); }
+  });
+}
+
+async function showReviewList() {
+  rv = null;
+  rl = rl || { list: null, subj: "", due: null };
+  rl.rec = null; rl.peek = null;
+  showReviewView(); setReviewTop(true);
+  $("#rvActions").innerHTML = ""; $("#rvActions").hidden = true;
+  if (!rl.list) $("#rvStage").innerHTML = '<div class="st-wrap"><div class="typing">불러오는 중</div></div>';
+  else renderReviewList();
+  await reviewSaving;  // 방금 매긴 것까지 목록에 보이게
+  const [l, d] = await Promise.allSettled([
+    api("/api/reviews").then(r => r.json()),
+    api(`/api/review${current ? `?subject=${encodeURIComponent(current)}` : ""}`).then(r => r.json())]);
+  if (!rl) return;
+  rl.list = l.status === "fulfilled" ? l.value.reviews : (rl.list || []);
+  rl.due = d.status === "fulfilled" ? d.value.cards.length : null;
+  if (l.status === "rejected") toast(l.reason.message);
+  renderReviewList();
+}
+const miniDist = c => `<span class="mini">${RV_BTNS.map(b => c[b.key] ? `<i class="c-${b.key}" style="flex:${c[b.key]}"></i>` : "").join("")}</span>`;
+function renderReviewList() {
+  if (!rl || !rl.list || rl.rec) return;
+  const all = rl.list;
+  const count = new Map();
+  for (const r of all) count.set(r.scope ?? null, (count.get(r.scope ?? null) || 0) + 1);
+  const order = state.subjects.map(s => s.name);
+  const rank = a => a === null ? -1 : order.includes(a) ? order.indexOf(a) : 1e6;
+  const subs = [...count.keys()].sort((a, b) => rank(a) - rank(b));
+  if (rl.subj !== "" && !count.has(rl.subj)) rl.subj = "";
+  const chips = subs.length > 1 ? `<div class="chips" role="group" aria-label="과목으로 거르기">
+      <button class="chip-btn${rl.subj === "" ? " on" : ""}" data-s="">전체<span class="c">${all.length}</span></button>
+      ${subs.map((s, i) => `<button class="chip-btn${rl.subj === s ? " on" : ""}" data-k="${i}">${esc(s ?? "전체 과목")}<span class="c">${count.get(s)}</span></button>`).join("")}
+    </div>` : "";
+  const list = all.filter(r => rl.subj === "" || (r.scope ?? null) === rl.subj);
+  const groups = new Map();
+  for (const r of list) { const g = chatGroup(r.updated); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
+  const due = rl.due, where = current ? `${esc(current)}에서 ` : "";
+  const top = `<div class="rv-due"><span class="ic">${icon("review")}</span><span class="tx">
+      <b>${due === null ? "오늘 복습할 카드를 확인하지 못했어요" : due ? `오늘 복습할 카드 ${due}장` : "오늘 복습할 카드가 없어요"}</b>
+      <span>${due ? `${where}복습해요. 매긴 결과는 아래 기록에 남아요.` : `${where}퀴즈를 풀면 틀린 문제가 복습 카드로 쌓여요.`}</span></span>
+      ${due ? `<button class="btn primary" id="rlStart">복습 시작<kbd>Enter</kbd></button>` : `<button class="btn" id="rlQuiz">${icon("quiz", 16)}퀴즈 풀기</button>`}</div>`;
+  $("#rvStage").innerHTML = `<div class="st-wrap">${top}${chips}${!all.length
+      ? '<div class="blank">아직 복습 기록이 없어요. 복습을 하면 어떤 카드를 어떻게 매겼는지 여기에 남아요.</div>'
+      : [...groups].map(([g, rs]) => `<div class="chat-group"><div class="st-h">${g}</div><div class="chat-list">${rs.map(r => `
+        <div class="chat-row" data-id="${r.id}" role="button" tabindex="0" title="눌러서 매긴 카드를 다시 봐요">
+          <span class="ic">${icon("review")}</span>
+          <span class="tx"><b>${esc(r.title)}</b>${meta([`${r.count}장 복습`, r.counts.again && `다시 ${r.counts.again}`, r.counts.hard && `어려움 ${r.counts.hard}`, !r.done && `${r.total}장 중 중간에 멈춤`])}</span>
+          <span class="when">${miniDist(r.counts)}${esc(chatWhen(r.updated))}</span>
+          <span class="ops"><button class="icon-btn ren" title="제목 바꾸기" aria-label="제목 바꾸기">${icon("edit", 16)}</button><button class="icon-btn del" title="삭제" aria-label="삭제">${icon("trash", 16)}</button></span>
+        </div>`).join("")}</div></div>`).join("")}</div>`;
+  const b = $("#rlStart"); if (b) b.onclick = startReview;
+  const q = $("#rlQuiz"); if (q) q.onclick = () => { closeReview(); openQuizSetup(); };
+  $("#rvStage").querySelectorAll(".chip-btn").forEach(c => c.onclick = () => { rl.subj = c.dataset.s === "" ? "" : subs[+c.dataset.k]; renderReviewList(); });
+  $("#rvStage").querySelectorAll(".chat-row[data-id]").forEach(row => {
+    const id = row.dataset.id;
+    row.onclick = () => openReviewRecord(id);
+    row.onkeydown = e => { if (e.key === "Enter" && e.target === row) { e.stopPropagation(); openReviewRecord(id); } };
+    row.querySelector(".del").onclick = e => { e.stopPropagation(); deleteReviewRecord(id); };
+    row.querySelector(".ren").onclick = e => { e.stopPropagation(); renameReviewRecord(id); };
+  });
+}
+async function openReviewRecord(id) {
+  let rec;
+  try { rec = await (await api(`/api/reviews/get?id=${id}`)).json(); } catch (e) { return toast(e.message); }
+  if (!rl) return;
+  rl.rec = rec; rl.peek = null; renderReviewRecord(); $("#rvStage").scrollTop = 0;
+}
+function backFromRecord() {
+  if (rl.peek !== null) { rl.peek = null; return renderReviewRecord(); }
+  showReviewList();
+}
+function renderReviewRecord() {
+  const rec = rl.rec, items = rec.items || [];
+  setReviewTop(true, rec.title);
+  if (rl.peek !== null) {  // 카드 하나 다시 보기
+    const it = items[rl.peek];
+    $("#rvStage").innerHTML = `<div class="sheet">
+        <div class="tags"><span class="tag">${esc(it.subject)}</span>${it.topic ? `<span class="tag">${esc(it.topic)}</span>` : ""}<span class="tag">내가 매긴 것: ${RV_LABEL[it.button]}</span>${it.interval ? `<span class="tag">다음 복습 ${fmtDays(it.interval)}</span>` : ""}</div>
+        <div class="q-text bubble md">${md(it.question)}</div>
+        <div class="answer-sec bubble md">${md(it.answer)}</div>
+        <div class="src">출처 ${linkCites(esc(it.source))}</div></div>`;
+    $("#rvActions").hidden = false;
+    $("#rvActions").innerHTML = `<div class="row"><span class="grow">${rl.peek + 1} / ${items.length}</span>
+      ${rl.peek > 0 ? '<button class="btn" id="rdPrev">이전 카드</button>' : ""}
+      <button class="btn primary" id="rdBack">기록으로 돌아가기<kbd>Enter</kbd></button></div>`;
+    $("#rdBack").onclick = backFromRecord;
+    const pv = $("#rdPrev"); if (pv) pv.onclick = () => { rl.peek--; renderReviewRecord(); };
+    return;
+  }
+  const c = Object.fromEntries(RV_BTNS.map(b => [b.key, items.filter(it => it.button === b.key).length]));
+  const hard = items.filter(it => it.button === "again" || it.button === "hard");
+  $("#rvActions").innerHTML = ""; $("#rvActions").hidden = true;
+  $("#rvStage").innerHTML = `<div class="result">
+      <h2>${items.length}장을 복습했어요</h2>
+      <p>${meta([rec.scope || "전체 과목", chatWhen(rec.created), !rec.done && `${rec.total}장 중 중간에 멈춤`])}</p>
+      <div class="dist">${RV_BTNS.map(b => c[b.key] ? `<i class="c-${b.key}" style="flex:${c[b.key]}"></i>` : "").join("")}</div>
+      <div class="legend">${RV_BTNS.map(b => `<span><i class="c-${b.key}"></i>${b.label} <b>${c[b.key]}</b></span>`).join("")}</div>
+      <div class="marks">${items.map((it, i) => `<button class="mark-row" data-i="${i}" title="눌러서 질문과 정답 보기"><span class="ic rate c-${it.button}">${RV_LABEL[it.button]}</span>
+        <span class="q bubble md">${md(it.question.split("\n")[0])}</span><span class="tp">${esc(it.topic || "")}</span></button>`).join("")}</div>
+      <div class="row">
+        ${hard.length ? `<button class="btn primary" id="rdPractice">${icon("review", 16)}헷갈린 카드 ${hard.length}장 다시 보기</button>` : ""}
+        <button class="btn ghost" id="rdList">복습 기록</button></div>
+      ${hard.length ? '<p class="note">다시 보기는 연습이라 복습 날짜는 바뀌지 않아요.</p>' : ""}</div>`;
+  $("#rvStage").querySelectorAll(".mark-row").forEach(b => b.onclick = () => { rl.peek = +b.dataset.i; renderReviewRecord(); $("#rvStage").scrollTop = 0; });
+  $("#rdList").onclick = showReviewList;
+  const pr = $("#rdPractice"); if (pr) pr.onclick = () => {
+    rv = { queue: hard.map(card => ({ card, repeat: true })), total: hard.length, done: 0, revealed: false,
+           counts: { again: 0, hard: 0, good: 0, easy: 0 }, weak: new Map(), scope: rec.scope, log: [], practice: true };
+    rl = null; setReviewTop(false); renderReview();
+  };
+}
+async function deleteReviewRecord(id) {
+  const r = rl?.list.find(x => x.id === id);
+  if (!await ask({ title: "복습 기록을 삭제할까요?", desc: `"${r?.title || "이 복습"}" 기록을 컴퓨터 휴지통으로 옮겨요. 복습 카드와 다음 복습 날짜는 그대로예요.`, ok: "삭제", danger: true })) return;
+  try { await api("/api/reviews/delete", { method: "POST", body: JSON.stringify({ id }) }); } catch (e) { return toast(e.message); }
+  toast("복습 기록을 삭제했어요");
+  showReviewList();
+}
+async function renameReviewRecord(id) {
+  const r = rl?.list.find(x => x.id === id);
+  const title = await ask({ title: "복습 제목 바꾸기", label: "제목", value: r?.title || "", ok: "바꾸기" });
+  if (!title) return;
+  try { await api("/api/reviews/rename", { method: "POST", body: JSON.stringify({ id, title }) }); } catch (e) { return toast(e.message); }
+  showReviewList();
 }
 
 function renderReview() {
@@ -2074,7 +2365,7 @@ function renderReview() {
 
   const { card, repeat } = rv.queue[0];
   stage.innerHTML = `<div class="sheet">
-      <div class="tags">${repeat ? '<span class="tag again">한 번 더</span>' : ""}
+      <div class="tags">${rv.practice ? '<span class="tag again">다시 보기</span>' : repeat ? '<span class="tag again">한 번 더</span>' : ""}
         <span class="tag">${esc(card.subject)}</span>${card.topic ? `<span class="tag">${esc(card.topic)}</span>` : ""}
         ${card.lapses ? `<span class="tag">${card.lapses}번 틀림</span>` : ""}</div>
       <div class="q-text bubble md">${md(card.question)}</div>
@@ -2082,7 +2373,7 @@ function renderReview() {
         <div class="src">출처 ${linkCites(esc(card.source))}${card.note ? ` · ${esc(card.note)}` : ""}</div>
         <div id="rvExplain"></div>` : ""}
     </div>
-    ${rv.revealed ? `<div class="sub-links"><button class="btn ghost" id="rvWhy">${icon("ask", 16)}이 개념 설명 듣기</button><button class="btn ghost danger" id="rvDel">${icon("trash", 16)}카드 삭제</button></div>` : ""}`;
+    ${rv.revealed ? `<div class="sub-links"><button class="btn ghost" id="rvWhy">${icon("ask", 16)}이 개념 설명 듣기</button>${rv.practice ? "" : `<button class="btn ghost danger" id="rvDel">${icon("trash", 16)}카드 삭제</button>`}</div>` : ""}`;
 
   if (!rv.revealed) {
     actions.innerHTML = `<div class="rate one"><button class="show" id="rvShow">정답 보기<kbd>Space</kbd></button></div>`;
@@ -2097,7 +2388,7 @@ function renderReview() {
   }
   if (rv.revealed) {
     $("#rvWhy").onclick = () => explain(card);
-    $("#rvDel").onclick = async () => {
+    if (!rv.practice) $("#rvDel").onclick = async () => {
       if (!await ask({ title: "복습 카드를 삭제할까요?", desc: "이 카드를 지우면 다시 복습에 나오지 않아요. 되돌릴 수 없어요.", ok: "삭제", danger: true })) return;
       try { await api("/api/card/delete", { method: "POST", body: JSON.stringify({ id: card.id }) }); } catch (e) { return toast(e.message); }
       rv.queue = rv.queue.filter(q => q.card.id !== card.id); rv.total -= repeat ? 0 : 1; rv.revealed = false; renderReview();
@@ -2111,10 +2402,13 @@ async function answer(button) {
   const item = rv.queue[0];
   if (button) {
     rv.saving = true;
-    try { await api("/api/grade", { method: "POST", body: JSON.stringify({ id: item.card.id, button }) }); }
+    let r;
+    try { r = await (await api("/api/grade", { method: "POST", body: JSON.stringify({ id: item.card.id, button }) })).json(); }
     catch (e) { rv.saving = false; return toast("저장하지 못했어요: " + e.message); }
     rv.saving = false;
     rv.counts[button]++; rv.done++;
+    const c = item.card;
+    rv.log.push({ card_id: c.id, subject: c.subject, topic: c.topic, question: c.question, answer: c.answer, source: c.source, button, interval: r.interval });
     loadState(); // 사이드바의 남은 복습 수도 바로 갱신
     if (button === "again" || button === "hard") {
       const t = item.card.topic || item.card.source; rv.weak.set(t, (rv.weak.get(t) || 0) + 1);
@@ -2122,6 +2416,8 @@ async function answer(button) {
   }
   rv.queue.shift();
   if (button === "again") rv.queue.push({ card: item.card, repeat: true }); // Anki처럼 세션 끝에 한 번 더
+  if (rv.practice) rv.done++;
+  if (button || !rv.queue.length) saveReview();  // 매길 때마다, 그리고 다 끝났을 때 기록
   rv.revealed = false;
   renderReview();
   $("#rvStage").scrollTop = 0;
@@ -2131,7 +2427,10 @@ function renderReviewDone() {
   $("#rvBar").style.width = "100%";
   const c = rv.counts, graded = c.again + c.hard + c.good + c.easy;
   const weak = [...rv.weak.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  $("#rvStage").innerHTML = graded === 0
+  $("#rvStage").innerHTML = rv.practice
+    ? `<div class="result"><h2>다시 보기를 마쳤어요</h2><p>헷갈린 카드 ${rv.total}장을 다시 봤어요. 복습 날짜는 그대로예요.</p>
+        <div class="row"><button class="btn ghost" id="rvBack">복습 기록</button></div></div>`
+    : graded === 0
     ? `<div class="result"><h2>오늘 복습할 카드가 없어요</h2>
         <p>${rv.scope ? `${esc(rv.scope)}에서 ` : ""}퀴즈를 풀면 틀린 문제가 복습 카드로 쌓여요.</p>
         <div class="row"><button class="btn primary" id="rvQuiz">${icon("quiz", 16)}퀴즈 풀기</button><button class="btn ghost" id="rvBack">닫기</button></div></div>`
@@ -2139,10 +2438,10 @@ function renderReviewDone() {
         <div class="dist">${RV_BTNS.map(b => c[b.key] ? `<i class="c-${b.key}" style="flex:${c[b.key]}"></i>` : "").join("")}</div>
         <div class="legend">${RV_BTNS.map(b => `<span><i class="c-${b.key}"></i>${b.label} <b>${c[b.key]}</b></span>`).join("")}</div>
         ${weak.length ? `<div class="weak"><b>헷갈린 주제</b>${weak.map(([t, n]) => `${esc(t)}${n > 1 ? ` (${n}번)` : ""}`).join(", ")}</div>` : ""}
-        <div class="row">${weak.length ? `<button class="btn primary" id="rvWeak">${icon("target", 16)}헷갈린 주제 정리</button>` : ""}<button class="btn ghost" id="rvBack">닫기</button></div></div>`;
+        <div class="row">${weak.length ? `<button class="btn primary" id="rvWeak">${icon("target", 16)}헷갈린 주제 정리</button>` : ""}<button class="btn ghost" id="rvBack">복습 기록</button></div></div>`;
   $("#rvActions").innerHTML = ""; $("#rvActions").hidden = true;
   $("#rvLeft").textContent = "";
-  $("#rvBack").onclick = closeReview;
+  $("#rvBack").onclick = showReviewList;
   const q = $("#rvQuiz"); if (q) q.onclick = () => { closeReview(); openQuizSetup(); };
   const w = $("#rvWeak"); if (w) w.onclick = () => {
     const topics = weak.map(([t]) => t).join(", ");
@@ -2177,10 +2476,18 @@ async function explain(card) {
 }
 
 document.addEventListener("keydown", e => {
-  if (!rv || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
+  if ((!rv && !rl) || $("#review").hidden || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
   if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
   if (document.querySelector("dialog[open]")) return;
-  if (e.key === "Escape") { e.preventDefault(); return closeReview(); }
+  if (rl) {  // 복습 기록 화면: Esc = 한 단계 뒤로·닫기, Enter = 복습 시작 / 기록으로 돌아가기
+    if (e.key === "Escape") { e.preventDefault(); return rl.rec ? backFromRecord() : closeReview(); }
+    if (e.key === "Enter" && !e.target.closest?.("button, .chat-row")) {
+      if (rl.rec && rl.peek !== null) { e.preventDefault(); return backFromRecord(); }
+      if (!rl.rec && $("#rlStart")) { e.preventDefault(); return startReview(); }
+    }
+    return;
+  }
+  if (e.key === "Escape") { e.preventDefault(); return showReviewList(); }  // 매긴 카드는 이미 기록돼 있음
   if (!rv.queue.length) return;
   if (e.key === " " || e.key === "Enter") {
     e.preventDefault();
@@ -2190,7 +2497,7 @@ document.addEventListener("keydown", e => {
   const b = RV_BTNS.find(x => x.hotkey === e.key);
   if (b && rv.revealed && !rv.queue[0].repeat) { e.preventDefault(); answer(b.key); }
 });
-$("#rvExit").onclick = closeReview;
+$("#rvExit").onclick = () => !rl ? showReviewList() : rl.rec ? backFromRecord() : closeReview();
 
 /* ── 입력창 ── */
 const input = $("#input");

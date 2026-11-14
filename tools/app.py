@@ -45,7 +45,8 @@ def code_version() -> float:
 
 STARTED_VERSION = code_version()
 state_lock = threading.Lock()
-# Claude 실행 칸: chat(질문·설명) / job(퀴즈 출제·스튜디오 만들기). 칸마다 하나씩이라 퀴즈를 만드는 동안에도 질문할 수 있다
+# Claude 실행 칸: chat(질문·설명) / quiz(퀴즈 출제·시험 스타일 분석) / studio(스튜디오 만들기).
+# 칸마다 하나씩이라 퀴즈를 만드는 동안에도 질문하거나 스튜디오 자료를 만들 수 있다
 procs: dict[str, subprocess.Popen] = {}
 
 
@@ -114,6 +115,99 @@ def chat_save(data: dict) -> dict:
     tmp.write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
     tmp.replace(path)
     return {"ok": True, "id": cid, "title": title}
+
+
+# ───────────────────────── 퀴즈 기록 ─────────────────────────
+# 퀴즈마다 data/quizzes/<id>.json. 문제를 만들면 바로 저장하고, 풀 때마다 진행 상황을 덮어쓴다
+QUIZZES = ROOT / "data" / "quizzes"
+QUIZ_KEYS = ("cfg", "qs", "idx", "phase", "retry", "styleUsed", "saved", "savedCount")
+# 복습도 한 번 할 때마다 data/reviews/<id>.json (어떤 카드를 어떻게 매겼는지)
+REVIEWS = ROOT / "data" / "reviews"
+REVIEW_KEYS = ("scope", "total", "done", "items")
+RECORDS = {"quizzes": QUIZZES, "reviews": REVIEWS}  # 제목 바꾸기·삭제·열기는 둘 다 같은 방식
+
+
+def record_path(kind: str, rid: str) -> Path:
+    if kind not in RECORDS or not CHAT_ID.match(rid or ""):
+        raise ValueError("잘못된 기록이에요")
+    return RECORDS[kind] / f"{rid}.json"
+
+
+def quiz_path(qid: str) -> Path:
+    return record_path("quizzes", qid)
+
+
+def write_record(path: Path, rec: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(path)
+
+
+def quiz_list() -> list[dict]:
+    out = []
+    for f in QUIZZES.glob("*.json") if QUIZZES.exists() else []:
+        try:
+            r = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        qs, cfg = r.get("qs") or [], r.get("cfg") or {}
+        v = [q.get("verdict") for q in qs]
+        out.append({"id": r["id"], "title": r.get("title", ""), "subject": cfg.get("subject"), "level": cfg.get("level"),
+                    "created": r.get("created"), "updated": r.get("updated"), "total": len(qs),
+                    "answered": sum(1 for x in v if x), "correct": v.count("correct"), "partial": v.count("partial"),
+                    "done": r.get("phase") == "done", "retry": bool(r.get("retry")),
+                    "search": " ".join(q.get("question", "")[:200] for q in qs)[:3000]})
+    return sorted(out, key=lambda r: r.get("updated") or "", reverse=True)
+
+
+def quiz_save(data: dict) -> dict:
+    import uuid
+    if not data.get("qs"):
+        raise ValueError("저장할 문제가 없어요")
+    qid = data.get("id") or uuid.uuid4().hex
+    path = quiz_path(qid)
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    old = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    cfg = data.get("cfg") or {}
+    title = old.get("title") or data.get("title") or \
+        f"{'다시 풀기 · ' if data.get('retry') else ''}{cfg.get('subject', '')} · {cfg.get('scope') or '전체 범위'}"
+    rec = {"id": qid, "title": title[:80], "created": old.get("created", now), "updated": now,
+           **{k: data.get(k) for k in QUIZ_KEYS}}
+    write_record(path, rec)
+    return {"ok": True, "id": qid, "title": rec["title"]}
+
+
+def review_list() -> list[dict]:
+    out = []
+    for f in REVIEWS.glob("*.json") if REVIEWS.exists() else []:
+        try:
+            r = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        items = r.get("items") or []
+        counts = {b: sum(1 for it in items if it.get("button") == b) for b in srs.BUTTONS}
+        subjects = sorted({it.get("subject") for it in items if it.get("subject")})
+        out.append({"id": r["id"], "title": r.get("title", ""), "scope": r.get("scope"), "subjects": subjects,
+                    "created": r.get("created"), "updated": r.get("updated"), "count": len(items),
+                    "total": r.get("total") or len(items), "done": bool(r.get("done")), "counts": counts,
+                    "search": " ".join(f"{it.get('topic', '')} {it.get('question', '')[:150]}" for it in items)[:3000]})
+    return sorted(out, key=lambda r: r.get("updated") or "", reverse=True)
+
+
+def review_save(data: dict) -> dict:
+    import uuid
+    if not data.get("items"):
+        raise ValueError("저장할 복습이 없어요")
+    rid = data.get("id") or uuid.uuid4().hex
+    path = record_path("reviews", rid)
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    old = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    title = old.get("title") or f"{data.get('scope') or '전체 과목'} 복습"
+    rec = {"id": rid, "title": title[:80], "created": old.get("created", now), "updated": now,
+           **{k: data.get(k) for k in REVIEW_KEYS}}
+    write_record(path, rec)
+    return {"ok": True, "id": rid, "title": rec["title"]}
 
 
 ORDER_FILE = ROOT / "data" / "subject_order.json"
@@ -806,6 +900,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(json.loads(p.read_text(encoding="utf-8")))
             except (ValueError, OSError) as exc:
                 self._json({"error": f"대화 기록을 열지 못했어요: {exc}"}, 404)
+        elif path == "/api/quizzes":
+            self._json({"quizzes": quiz_list()})
+        elif path == "/api/reviews":
+            self._json({"reviews": review_list()})
+        elif path in ("/api/quizzes/get", "/api/reviews/get"):
+            try:
+                p = record_path(path.split("/")[2], parse_qs(urlparse(self.path).query).get("id", [""])[0])
+                self._json(json.loads(p.read_text(encoding="utf-8")))
+            except (ValueError, OSError) as exc:
+                self._json({"error": f"기록을 열지 못했어요: {exc}"}, 404)
         elif path == "/api/studio":
             q = parse_qs(urlparse(self.path).query)
             self._json({"docs": studio_list(q["subject"][0] if q.get("subject") else None)})
@@ -861,10 +965,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": True})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return
-            if url.path == "/api/stop":  # kind: chat(질문 답변 + iClass 받기) / job(퀴즈·스튜디오) / 없으면 전부
+            if url.path == "/api/stop":  # kind: chat(질문 답변 + iClass 받기) / quiz / studio / 없으면 전부
                 kind = (json.loads(self._body() or b"{}") or {}).get("kind")
                 stop_claude(kind)
-                if kind != "job":
+                if kind in (None, "chat"):
                     stop_iclass()
                 return self._json({"ok": True})
             if url.path == "/api/iclass/login":
@@ -929,6 +1033,20 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/chats/delete":
                 recycle([chat_path(json.loads(self._body())["id"])])
                 return self._json({"ok": True})
+            if url.path == "/api/quizzes/save":
+                return self._json(quiz_save(json.loads(self._body())))
+            if url.path == "/api/reviews/save":
+                return self._json(review_save(json.loads(self._body())))
+            if url.path in ("/api/quizzes/rename", "/api/reviews/rename"):
+                data = json.loads(self._body())
+                p = record_path(url.path.split("/")[2], data["id"])
+                rec = json.loads(p.read_text(encoding="utf-8"))
+                rec["title"] = re.sub(r"\s+", " ", str(data["title"])).strip()[:80] or rec["title"]
+                write_record(p, rec)
+                return self._json({"ok": True, "title": rec["title"]})
+            if url.path in ("/api/quizzes/delete", "/api/reviews/delete"):
+                recycle([record_path(url.path.split("/")[2], json.loads(self._body())["id"])])
+                return self._json({"ok": True})
             if url.path == "/api/subject/order":
                 save_order(json.loads(self._body())["order"])
                 return self._json({"ok": True})
@@ -963,9 +1081,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": str(exc)}, 400)
         self._json({"error": "not found"}, 404)
 
-    def _stream_start(self) -> bool:
-        if is_busy("job"):
-            self._json({"error": "퀴즈나 자료를 만드는 중이에요. 끝난 뒤에 다시 해주세요."}, 409)
+    def _stream_start(self, slot: str) -> bool:
+        if is_busy(slot):
+            what = "퀴즈를" if slot == "quiz" else "스튜디오 자료를"
+            self._json({"error": f"{what} 만드는 중이에요. 끝난 뒤에 다시 해주세요."}, 409)
             return False
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
@@ -974,7 +1093,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         return True
 
-    def _sender(self, slot: str = "job"):
+    def _sender(self, slot: str):
         state = {"alive": True}
 
         def send(obj):
@@ -1044,10 +1163,10 @@ class Handler(BaseHTTPRequestHandler):
         data = json.loads(self._body())
         subject = safe_name(data["subject"])
         n = max(1, min(int(data.get("n", 10)), 20))
-        if not self._stream_start():
+        if not self._stream_start("quiz"):
             return
         sync_materials()
-        send = self._sender()
+        send = self._sender("quiz")
         result = {}
         extra = ["--json-schema", json.dumps(QUIZ_SCHEMA)]
 
@@ -1065,7 +1184,7 @@ class Handler(BaseHTTPRequestHandler):
                     send({"type": "tool", "label": f"시험 스타일 분석 중 (자료 {len(info['files'])}개, 처음 한 번)"})
                     sres = {}
                     stream_claude(style_prompt(subject, info["files"]), None, forward,
-                                  ["--json-schema", json.dumps(STYLE_SCHEMA)], on_result=sres.update, slot="job")
+                                  ["--json-schema", json.dumps(STYLE_SCHEMA)], on_result=sres.update, slot="quiz")
                     guide = (sres.get("structured_output") or {}).get("guide") or guide
                     if guide and (sres.get("structured_output") or {}).get("guide"):
                         save_style(subject, guide, info["sig"])
@@ -1073,10 +1192,14 @@ class Handler(BaseHTTPRequestHandler):
                 send({"type": "style", "used": bool(guide or note), "files": len(info["files"]), "note": bool(note)})
             prompt = quiz_prompt(subject, (data.get("scope") or "").strip(), n, data.get("level", "보통"),
                                  data.get("qtype", "mix"), guide, note)
-            stream_claude(prompt, None, forward, extra, on_result=result.update, slot="job")
+            stream_claude(prompt, None, forward, extra, on_result=result.update, slot="quiz")
             qs = clean_questions((result.get("structured_output") or {}).get("questions") or [])
             if qs:
-                send({"type": "quiz", "questions": qs})
+                # 화면을 닫거나 다른 퀴즈를 보고 있어도 남도록 서버에서 바로 기록한다
+                cfg = {k: data.get(k) for k in ("subject", "scope", "n", "level", "qtype", "style")}
+                qs = [{**q, "user": None, "verdict": None} for q in qs]
+                saved = quiz_save({"cfg": cfg, "qs": qs, "idx": 0, "phase": "answer", "styleUsed": bool(guide or note)})
+                send({"type": "quiz", "questions": qs, "id": saved["id"], "title": saved["title"]})
             elif not result.get("is_error"):
                 send({"type": "error", "message": "문제를 만들지 못했어요. 범위를 바꿔서 다시 해보세요."})
         except Exception as exc:
@@ -1094,10 +1217,10 @@ class Handler(BaseHTTPRequestHandler):
         if kind == "custom" and not custom:
             raise ValueError("만들 내용을 적어주세요")
         scope = (data.get("scope") or "").strip()
-        if not self._stream_start():
+        if not self._stream_start("studio"):
             return
         sync_materials()
-        send = self._sender()
+        send = self._sender("studio")
         result = {}
 
         def forward(ev):  # 진행 상황만 보여주고 중간 글은 숨긴다
@@ -1105,7 +1228,7 @@ class Handler(BaseHTTPRequestHandler):
                 send(ev)
         try:
             stream_claude(studio_prompt(subject, kind, scope, custom), None, forward,
-                          ["--json-schema", json.dumps(DOC_SCHEMA)], on_result=result.update, slot="job")
+                          ["--json-schema", json.dumps(DOC_SCHEMA)], on_result=result.update, slot="studio")
             doc = result.get("structured_output") or {}
             if doc.get("markdown"):
                 title = doc.get("title") or STUDIO_TYPES.get(kind, ("직접 요청",))[0]
