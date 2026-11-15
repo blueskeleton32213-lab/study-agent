@@ -932,6 +932,7 @@ const ICONS = {
   formulas: '<path d="M17 5H7l5.5 7L7 19h10"/>',
   patterns: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
   glossary: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M9 8h6"/>',
+  intro: '<circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
   custom: '<path d="M14.5 4.5l5 5L9 20H4v-5z"/>',
   doc: '<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5V7h3"/>',
   download: '<path d="M12 4v11M7 10.5l5 5 5-5"/><path d="M5 19.5h14"/>',
@@ -1488,8 +1489,9 @@ $("#openAll").onclick =() => api(current ? `/api/open?subject=${encodeURICompone
 /* ── 대화 ── */
 // 질문에서 출처를 직접 물어봤으면 그 답변만 출처를 보여준다
 const CITE_ASK_RE = /출처|근거\s*(?:자료|페이지|쪽)|몇\s*(?:쪽|페이지|슬라이드)|어느\s*(?:자료|강의|슬라이드|페이지)|어디(?:에|서)\s*(?:나와|있)/;
-function bubble(role, text, cites) {
+function bubble(role, text, cites, subj) {
   const m = document.createElement("div"); m.className = "msg " + role + (cites ? " cites-on" : "");
+  if (subj) m.dataset.subj = subj;  // 이 말이 오갈 때의 과목 (드래그 질문이 이 과목 기준으로 묻게)
   const b = document.createElement("div"); b.className = "bubble" + (role === "bot" ? " md" : "");
   if (role === "bot") b.innerHTML = md(text); else b.textContent = text;
   m.append(b); $("#msgs").append(m); return b;
@@ -1506,7 +1508,11 @@ function renderHistory() {
       </ol></div>`;
     return;
   }
-  for (const h of history) h.role === "notice" ? notice(h.text) : bubble(h.role, h.text, h.cites);
+  let subj = null;  // 답변은 바로 앞 질문의 과목을 따른다
+  for (const h of history) {
+    if (h.role === "user") subj = h.subj || null;
+    h.role === "notice" ? notice(h.text) : bubble(h.role, h.text, h.cites, subj);
+  }
   scrollDown(true);
 }
 function notice(text) { const d = document.createElement("div"); d.className = "notice"; d.textContent = text; $("#msgs").append(d); }
@@ -1530,9 +1536,13 @@ async function send(message, shown) {
   if (st) closeStudio();
   if (hv) closeHistory();
   if (!history.length) $("#msgs").innerHTML = "";
-  history.push({ role: "user", text: shown ?? message, ...(current ? { subj: current } : {}) }); bubble("user", shown ?? message);
+  // 퀴즈·복습에서 보낸 메시지는 왼쪽 과목과 다를 수 있어 메시지에 적힌 과목을 우선한다
+  const subj = message.match(/^\[현재 과목: ([^\]\n]+)\]/)?.[1] || current;
+  const realSubj = subj && state.subjects.some(s => s.name === subj) ? subj : null;
+  history.push({ role: "user", text: shown ?? message, ...(realSubj ? { subj: realSubj } : {}) }); bubble("user", shown ?? message, null, realSubj);
   const wantCites = CITE_ASK_RE.test(shown ?? message);
   const holder = document.createElement("div"); holder.className = "msg bot" + (wantCites ? " cites-on" : "");
+  if (realSubj) holder.dataset.subj = realSubj;
   const inner = document.createElement("div"); inner.className = "bubble md";
   const tools = document.createElement("div"); tools.className = "tools";
   const body = document.createElement("div");
@@ -1738,6 +1748,7 @@ const ST_TYPES = {
   formulas: { ic: "formulas", name: "핵심 공식표", desc: "공식과 의미, 사용 조건을 표로. 이미지 속 수식도 원본을 보고 옮겨요" },
   patterns: { ic: "patterns", name: "기출 유형 분석", desc: "해설·모의고사·문제지에서 유형별 빈도, 함정, 대비 전략을 정리해요" },
   glossary: { ic: "glossary", name: "용어집", desc: "한글·영어 용어와 한 줄 정의, 헷갈리는 용어 비교" },
+  intro: { ic: "intro", name: "입문 가이드", desc: "처음 듣는 사람 기준으로 개념별 한 줄 요약, 직관→정의→예제, 그림 많이" },
   custom: { ic: "custom", name: "직접 요청", desc: "원하는 형태로 정리해 달라고 적어요" },
 };
 let st = null; // { view: home|gen|doc, subject, kind, docs, doc, tools, t0, timer }
@@ -2906,7 +2917,7 @@ document.addEventListener("keydown", e => {
 
 /* ── 질문 창: 드래그한 부분을 붙여서, 보던 화면(퀴즈·정리 자료)을 떠나지 않고 묻는다 ── */
 // 서버의 따로 된 실행 칸(ask)을 써서 질문하기 화면의 답변과 서로 기다리지 않는다. 이 창의 대화는 「새로 묻기」를 누를 때까지 이어진다
-let aw = { session: null, quote: null, busy: false, items: 0 };
+let aw = { session: null, quote: null, busy: false, items: 0, subject: null };  // subject: 이 창 대화의 과목 (이어 묻는 질문도 같은 과목으로)
 const AW_WHERE = { stStage: "정리 자료", qzStage: "퀴즈", rvStage: "복습 카드", msgs: "답변", askWin: "질문 창 답변" };
 const AW_CHIPS = ["쉽게 설명해줘", "예시를 들어줘", "왜 그런지 알려줘", "시험엔 어떻게 나와?"];
 function askPick(range, scope, text, cites) {
@@ -2925,7 +2936,10 @@ function askPick(range, scope, text, cites) {
   const bt = block?.textContent.replace(/\s+/g, " ").trim();
   if (bt && bt !== text.replace(/\s+/g, " ").trim()) parts.push(`주변 문장: ${bt}`);
   const id = area?.id;
-  const subject = (id === "stStage" && st?.subject) || (id === "qzStage" && qz?.cfg?.subject) || current;
+  // 왼쪽에서 고른 과목이 아니라, 드래그한 내용이 속한 과목을 기준으로 묻는다
+  const subject = (id === "stStage" && st?.subject) || (id === "qzStage" && qz?.cfg?.subject)
+    || (id === "rvStage" && rv?.queue?.[0]?.card?.subject) || (id === "msgs" && anc.closest(".msg")?.dataset.subj)
+    || (id === "askWin" && aw.subject) || current;
   return { text: text.trim().slice(0, 1500), where, context: parts.join("\n").slice(0, 1200), subject,
            solving: id === "qzStage" && !!qz && qz.phase === "answer",
            cites: cites.map(a => a.dataset.full || a.textContent) };
@@ -2940,6 +2954,7 @@ function openAsk(picked) {
   if (!aw.items) $("#awBody").innerHTML = "";
   $("#awBody").querySelector(".aw-quote.pending")?.remove();  // 아직 안 보낸 인용은 새 인용으로 바꾼다
   aw.quote = picked;
+  if (picked.subject) aw.subject = picked.subject;
   const q = document.createElement("div"); q.className = "aw-quote pending";
   q.innerHTML = `<small>${esc(picked.where)}에서 고른 부분</small>`; q.append(picked.text);
   $("#awBody").append(q);
@@ -2951,11 +2966,11 @@ function openAsk(picked) {
 function closeAsk() { $("#askWin").hidden = true; }
 function resetAsk() {
   if (aw.busy) api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "ask" }) });
-  aw = { session: null, quote: null, busy: false, items: 0 };
+  aw = { session: null, quote: null, busy: false, items: 0, subject: null };
   $("#awChips").hidden = true; awRender(); $("#awInput").focus();
 }
 function askMessage(q) {
-  const quote = aw.quote, subject = quote?.subject || current;
+  const quote = aw.quote, subject = quote?.subject || aw.subject || current;
   let m = subject ? `[현재 과목: ${subject}]\n` : "";
   if (!quote) return m + q;
   m += `[질문 창 — 학생이 ${quote.where}에서 드래그한 부분에 대해 묻는다. 답은 핵심 위주로 짧게(10줄 안팎).]\n`;
