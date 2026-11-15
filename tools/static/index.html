@@ -785,7 +785,7 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
     <p class="desc" style="margin-top:8px">범위가 넓으면 1~4분쯤 걸려요.</p>
     <div class="dlg-btns">
       <button class="btn" value="cancel">취소</button>
-      <button class="btn primary" value="ok">만들기</button>
+      <button class="btn primary" value="ok">만들기<kbd>Enter</kbd></button>
     </div>
   </form>
 </dialog>
@@ -882,7 +882,7 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
     <textarea id="qNote" rows="3" placeholder="예: 중간고사는 서술형 5문제, 문제마다 (20점). 계산 과정을 꼭 써야 하고, 강의 예제에서 숫자만 바꿔서 냄."></textarea>
     <div class="dlg-btns">
       <button class="btn" value="cancel">취소</button>
-      <button class="btn primary" value="ok" id="qOk">문제 만들기</button>
+      <button class="btn primary" value="ok" id="qOk">문제 만들기<kbd>Enter</kbd></button>
     </div>
   </form>
 </dialog>
@@ -1740,6 +1740,12 @@ $("#quizDlg").addEventListener("close", async () => {
     level: $("#qLevel").value, qtype: $("#qType .on").dataset.v,
   });
 });
+// 퀴즈·스튜디오 만들기 창: Enter = 만들기 (폼 기본 동작은 첫 버튼인 '취소'라서 직접 처리). 메모 칸은 Shift+Enter로 줄바꿈
+for (const id of ["#quizDlg", "#stDlg"]) $(id).addEventListener("keydown", e => {
+  if (e.key !== "Enter" || e.isComposing || e.target.closest("button")) return;
+  if (e.target.tagName === "TEXTAREA" && e.shiftKey) return;
+  e.preventDefault(); $(id).close("ok");
+});
 $("#qType").onclick = e => { const b = e.target.closest("button"); if (!b) return; $("#qType .on").classList.remove("on"); b.classList.add("on"); };
 
 /* ── 스튜디오: 정리 자료 만들기·보관 ── */
@@ -1860,7 +1866,7 @@ function askStudio(kind) {
   $("#stCustomWrap").hidden = kind !== "custom";
   $("#stCustom").value = ""; $("#stScope").value = "";
   $("#stDlg").dataset.kind = kind;
-  $("#stDlg").showModal();
+  $("#stDlg").returnValue = ""; $("#stDlg").showModal();
   (kind === "custom" ? $("#stCustom") : $("#stScope")).focus();
 }
 $("#stDlg").addEventListener("close", () => {
@@ -2063,7 +2069,7 @@ function openQuizDialog() {
   if (!subs.length) return toast("먼저 과목을 만들고 자료를 넣어주세요");
   const sel = $("#qSubj"); sel.innerHTML = "";
   for (const s of subs) { const o = document.createElement("option"); o.textContent = s.name; if (s.name === current) o.selected = true; sel.append(o); }
-  $("#qRange").value = ""; $("#quizDlg").showModal();
+  $("#qRange").value = ""; $("#quizDlg").returnValue = ""; $("#quizDlg").showModal();
   loadQuizStyle(sel.value);
 }
 let qStyle = null; // { info, noteOrig }
