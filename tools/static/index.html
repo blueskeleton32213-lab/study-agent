@@ -5,15 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>학습 튜터</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%239B8CFF'/><path d='M9 9.5h6.2c1.5 0 2.8 1.2 2.8 2.8V23c-.6-.9-1.6-1.4-2.7-1.4H9z' fill='white'/><path d='M23 9.5h-2.4c-1.5 0-2.6 1.2-2.6 2.8V23c.6-.9 1.6-1.4 2.7-1.4H23z' fill='%235EEAD4'/></svg>">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/static/vendor/pretendard/pretendard.css">
+<!-- 명조 제목 글꼴만 온라인에서 받는다. 오프라인이면 바탕체로 대신 보인다 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&display=swap">
 <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("theme")) || "night"; } catch { document.documentElement.dataset.theme = "night"; }</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="/static/vendor/marked.min.js"></script>
+<script src="/static/vendor/purify.min.js"></script>
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+<script src="/static/vendor/katex/katex.min.js"></script>
 <style>
 /* ─────────────────────────────────────────────────────────────
    학습 튜터 — "밤샘 공부 책상" (다크 집중 모드)
@@ -1044,7 +1043,7 @@ function mermaidFig(code) {
 function loadMermaid() {
   return mmdLib ||= new Promise((ok, fail) => {
     const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js";
+    s.src = "/static/vendor/mermaid.min.js";
     s.onload = () => ok(window.mermaid); s.onerror = () => { mmdLib = null; fail(new Error("mermaid를 불러오지 못했어요")); };
     document.head.append(s);
   });

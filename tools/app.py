@@ -25,6 +25,8 @@ TOOLS = ROOT / "tools"
 MATERIALS = ROOT / "materials"
 TEXTS = ROOT / "texts"
 STATIC = TOOLS / "static"
+STATIC_TYPES = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2",
+                ".woff": "font/woff", ".ttf": "font/ttf", ".ico": "image/x-icon", ".png": "image/png", ".svg": "image/svg+xml"}
 PORT = int(os.environ.get("STUDY_APP_PORT", "8765"))
 IDLE_EXIT_SECONDS = 180  # 화면 heartbeat가 이만큼 없으면 종료
 ALLOWED_EXT = {".pdf", ".pptx", ".docx"}
@@ -920,6 +922,17 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+        elif path.startswith("/static/"):  # 화면 라이브러리·글꼴 (tools/static/vendor, 인터넷 없이도 화면이 뜨게)
+            f = (STATIC / path[len("/static/"):]).resolve()
+            if not f.is_file() or not f.is_relative_to(STATIC.resolve()):
+                return self._json({"error": "not found"}, 404)
+            body = f.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", STATIC_TYPES.get(f.suffix.lower(), "application/octet-stream"))
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "private, max-age=86400")
             self.end_headers()
             self.wfile.write(body)
         elif path == "/api/state":
