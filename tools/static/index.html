@@ -2895,6 +2895,15 @@ document.addEventListener("selectionchange", () => { if (getSelection().isCollap
 document.addEventListener("scroll", hideCitePop, true);
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !citePop.hidden) hideCitePop(); });
 
+// F11 = 전체화면 (앱 창이면 pywebview 창 자체, 브라우저로 열었으면 Fullscreen API)
+document.addEventListener("keydown", e => {
+  if (e.key !== "F11") return;
+  e.preventDefault();
+  if (window.pywebview?.api?.toggle_fullscreen) window.pywebview.api.toggle_fullscreen();
+  else if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(() => {});
+});
+
 /* ── 질문 창: 드래그한 부분을 붙여서, 보던 화면(퀴즈·정리 자료)을 떠나지 않고 묻는다 ── */
 // 서버의 따로 된 실행 칸(ask)을 써서 질문하기 화면의 답변과 서로 기다리지 않는다. 이 창의 대화는 「새로 묻기」를 누를 때까지 이어진다
 let aw = { session: null, quote: null, busy: false, items: 0 };

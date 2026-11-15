@@ -19,7 +19,7 @@
 그 밖에: 낮·밤 모드, 사이드바 접기(Ctrl+B), 과목 순서 끌어서 바꾸기, 과목 클릭으로 자료 목록 보기, 과목 삭제(Windows 휴지통으로 이동, 복원 가능).
 
 ## 필요한 것
-- Windows 10/11, Microsoft Edge
+- Windows 10/11 (WebView2 런타임, 기본 설치돼 있음)
 - Python 3.12 이상
 - [Claude Code](https://claude.com/claude-code) 설치 및 로그인 (`claude` 명령이 동작해야 해요)
 
@@ -34,7 +34,7 @@ python -m pip install -r requirements.txt
 ```powershell
 pythonw tools\launch.pyw
 ```
-서버(127.0.0.1:8765)를 켜고 Edge 앱 창을 열어요. 바탕화면 바로가기를 만들려면 대상은 `pythonw.exe`, 인수는 `tools\launch.pyw`, 아이콘은 `tools\static\app.ico`로 지정하세요.
+서버(127.0.0.1:8765)를 켜고 앱 창(pywebview, WebView2)을 열어요. 창을 닫으면 서버도 꺼지고, 다시 실행하면 열려 있는 창이 앞으로 와요. 바탕화면 바로가기를 만들려면 대상은 `pythonw.exe`, 인수는 `tools\launch.pyw`, 아이콘은 `tools\static\app.ico`로 지정하세요.
 코드를 고친 뒤 앱을 다시 열면 실행 중인 예전 서버를 알아서 새 서버로 바꿔요.
 
 ## 자료 넣기
@@ -49,7 +49,7 @@ CLAUDE.md              튜터 규칙 (Claude Code가 읽음)
 .claude/settings.json  앱에서 쓰는 도구 권한
 tools/
   app.py               앱 서버 (Python 표준 라이브러리만 사용)
-  launch.pyw           실행기 (서버 + Edge 앱 창)
+  launch.pyw           실행기 (서버 + pywebview 앱 창)
   extract.py           PDF·PPTX·DOCX → texts/ (쪽 번호, Word 수식은 LaTeX로)
   render.py            PDF 쪽 → 이미지 (수식·그림 확인용)
   digest.py            강의자료 요약본 (파일마다 한 번 만들어 재사용)
