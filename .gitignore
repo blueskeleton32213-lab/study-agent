@@ -13,6 +13,8 @@ cache/
 __pycache__/
 *.pyc
 *.tmp
+# 실행기 exe (PyInstaller로 다시 만든다)
+/*.exe
 
 # Claude Code 개인 설정
 .claude/settings.local.json

@@ -37,6 +37,13 @@ pythonw tools\launch.pyw
 서버(127.0.0.1:8765)를 켜고 앱 창(pywebview, WebView2)을 열어요. 창을 닫으면 서버도 꺼지고, 다시 실행하면 열려 있는 창이 앞으로 와요. 바탕화면 바로가기를 만들려면 대상은 `pythonw.exe`, 인수는 `tools\launch.pyw`, 아이콘은 `tools\static\app.ico`로 지정하세요.
 코드를 고친 뒤 앱을 다시 열면 실행 중인 예전 서버를 알아서 새 서버로 바꿔요.
 
+### exe로 실행하기
+```powershell
+python -m pip install pyinstaller
+python -m PyInstaller --noconfirm --onefile --noconsole --icon "$PWD\tools\static\app.ico" --name "학습 튜터" --distpath . tools\launch.pyw
+```
+프로젝트 폴더 맨 위에 `학습 튜터.exe`가 생겨요 (다른 곳으로 옮기지 말고 바로가기를 만드세요). exe에는 앱 창만 들어 있고 서버·도구는 설치된 Python(PATH의 `pythonw`)으로 돌아서, `tools/` 코드를 고쳐도 다시 만들 필요가 없어요. `launch.pyw`를 고쳤을 때만 다시 빌드하세요.
+
 ## 자료 넣기
 1. 왼쪽 **+** 버튼으로 과목을 만들어요.
 2. PDF·PPTX·DOCX 파일을 과목 이름 위로 끌어다 놓으면 `materials/<과목>/`에 복사되고 텍스트가 추출돼요.

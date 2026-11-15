@@ -9,8 +9,9 @@ import time
 import urllib.request
 from pathlib import Path
 
-TOOLS = Path(__file__).resolve().parent
-ROOT = TOOLS.parent
+FROZEN = getattr(sys, "frozen", False)  # PyInstaller exe면 True (exe는 프로젝트 폴더 맨 위에 둔다)
+ROOT = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent.parent
+TOOLS = ROOT / "tools"
 PORT = int(os.environ.get("STUDY_APP_PORT", "8765"))
 URL = f"http://127.0.0.1:{PORT}/"
 TITLE = "학습 튜터"
@@ -71,8 +72,16 @@ if server_up() and stale_server():
         time.sleep(0.5)
 
 if not server_up():
-    pythonw = Path(sys.executable).with_name("pythonw.exe")
-    subprocess.Popen([str(pythonw if pythonw.exists() else sys.executable), str(TOOLS / "app.py")],
+    if FROZEN:  # 서버·도구는 설치된 Python으로 돌린다 (tools/ 코드를 고쳐도 exe를 다시 만들 필요 없음)
+        import shutil
+        python = shutil.which("pythonw") or shutil.which("python")
+        if not python:
+            user32.MessageBoxW(None, "Python을 찾을 수 없어요. Python 3.12 이상을 설치하고 PATH에 추가해 주세요.", TITLE, 0x10)
+            sys.exit(1)
+    else:
+        pythonw = Path(sys.executable).with_name("pythonw.exe")
+        python = str(pythonw if pythonw.exists() else sys.executable)
+    subprocess.Popen([python, str(TOOLS / "app.py")],
                      cwd=TOOLS.parent, creationflags=NO_WINDOW | DETACHED, close_fds=True)
     for _ in range(50):
         if server_up():
