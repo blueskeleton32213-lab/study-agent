@@ -1,6 +1,6 @@
 """인하대 iClass(learn.inha.ac.kr)에서 강의자료를 받아 materials/<과목>/에 넣는다. (브라우저 없이 requests로)
 
-로그인 (비밀번호는 저장하지 않음, 쿠키만 data/iclass_state.json에 저장):
+로그인 (비밀번호는 저장하지 않음, 쿠키만 local/iclass_state.json에 저장 — 컴퓨터마다 따로):
   python tools/iclass.py login      → 아이디·비밀번호를 물어봄 (비밀번호는 화면에 안 보임)
                                        앱에서 부를 때는 표준입력으로 "아이디\\n비밀번호\\n"을 넘긴다
   python tools/iclass.py courses    → 이번 학기 수강 과목 목록
@@ -26,7 +26,7 @@ from urllib.parse import unquote, urlparse
 import requests
 
 ROOT = Path(__file__).resolve().parent.parent
-STATE_FILE = ROOT / "data" / "iclass_state.json"
+STATE_FILE = ROOT / "local" / "iclass_state.json"  # local/: 이 컴퓨터에만 두는 것 (동기화 안 함)
 MATERIALS = ROOT / "materials"
 BASE = "https://learn.inha.ac.kr"
 NEED_LOGIN = 3

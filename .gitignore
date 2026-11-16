@@ -8,6 +8,10 @@ studio/
 data/
 # 임시 파일
 cache/
+# 개발 작업 기록 (개인 기록, OneDrive로만 동기화)
+notes/
+# 이 컴퓨터에만 두는 것: iClass 로그인 쿠키, 창 위치
+local/
 
 # Python
 __pycache__/

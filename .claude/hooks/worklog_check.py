@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LOG = ROOT / "학습 튜터 작업 기록.md"
+LOG = ROOT / "notes" / "학습 튜터 작업 기록.md"  # notes/는 OneDrive와 연결된 폴더 (git에는 안 올림)
 WATCH_FILES = ["CLAUDE.md", "README.md", ".gitignore", "requirements.txt"]
 WATCH_DIRS = ["tools", ".claude"]
 SKIP_PARTS = {"__pycache__"}
@@ -39,7 +39,7 @@ def main() -> None:
         "decision": "block",
         "reason": (f"작업 기록보다 최근에 바뀐 파일이 있어요: {shown}. "
                    "CLAUDE.md의 '작업 기록' 규칙대로 이번 대화에서 한 일을 "
-                   "'학습 튜터 작업 기록.md'에 덧붙인 뒤, 한 줄로 알리고 마치세요."),
+                   "'notes/학습 튜터 작업 기록.md'에 덧붙인 뒤, 한 줄로 알리고 마치세요."),
     }, ensure_ascii=False))
 
 

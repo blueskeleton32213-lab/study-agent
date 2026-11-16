@@ -17,7 +17,34 @@ URL = f"http://127.0.0.1:{PORT}/"
 TITLE = "학습 튜터"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 DETACHED = getattr(subprocess, "DETACHED_PROCESS", 0)
-WINDOW_FILE = ROOT / "data" / "window.json"
+WINDOW_FILE = ROOT / "local" / "window.json"  # 창 크기·위치는 화면마다 달라서 컴퓨터마다 따로
+
+
+def git(*args: str, timeout: int = 15) -> subprocess.CompletedProcess | None:
+    import shutil
+    exe = shutil.which("git")
+    if not exe or not (ROOT / ".git").exists():
+        return None
+    try:
+        return subprocess.run([exe, *args], cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=timeout, creationflags=NO_WINDOW)
+    except Exception:
+        return None
+
+
+def sync_pull() -> None:
+    """다른 컴퓨터에서 고친 코드를 받아온다. 고치다 만 파일이 있거나 갈라졌으면 건드리지 않는다."""
+    st = git("status", "--porcelain", "--untracked-files=no")
+    if st is None or st.returncode or st.stdout.strip():
+        return
+    git("pull", "--ff-only", "--quiet", timeout=20)
+
+
+def sync_push() -> None:
+    """이 컴퓨터에서 커밋한 코드를 올려 둔다 (커밋 안 한 변경은 올리지 않음)."""
+    ahead = git("rev-list", "--count", "@{u}..HEAD")
+    if ahead and ahead.returncode == 0 and ahead.stdout.strip() not in ("", "0"):
+        git("push", "--quiet", timeout=30)
 
 user32 = ctypes.windll.user32
 user32.FindWindowW.restype = ctypes.c_void_p
@@ -58,6 +85,8 @@ def shutdown_server() -> None:
     except Exception:
         pass
 
+
+sync_pull()  # 받은 코드가 있으면 아래 stale 검사가 예전 서버를 내리고 새로 켠다
 
 if server_up() and stale_server():
     shutdown_server()
@@ -142,3 +171,4 @@ window.events.closing += on_closing
 # private_mode=False + storage_path: 테마 등 localStorage 설정이 다음 실행에도 남게
 webview.start(private_mode=False, storage_path=str(Path(os.environ["LOCALAPPDATA"]) / "StudyTutorApp" / "webview"))
 shutdown_server()  # 창을 닫으면 서버(와 돌던 Claude)도 같이 끈다
+sync_push()
