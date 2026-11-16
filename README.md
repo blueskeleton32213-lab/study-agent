@@ -55,7 +55,7 @@ python -m PyInstaller --noconfirm --onefile --noconsole --icon "$PWD\tools\stati
 - **컴퓨터마다 따로**: `local/`(iClass 로그인 쿠키, 창 크기·위치). iClass는 컴퓨터마다 한 번씩 로그인하세요.
 - 두 컴퓨터에서 **동시에 켜 두지 마세요.** 복습 카드 같은 파일이 서로 덮어써질 수 있어요. 한쪽을 닫고, OneDrive 동기화가 끝난 뒤(작업표시줄 구름 아이콘) 다른 쪽을 켜세요.
 
-두 번째 컴퓨터 처음 설정: OneDrive에 같은 계정으로 로그인해서 `학습 튜터 자료`가 내려받아지면, 그 폴더의 **`학습 튜터 설치.exe`를 더블클릭**하고 **설치**를 누르세요.
+두 번째 컴퓨터 처음 설정: OneDrive에 같은 계정으로 로그인해서 `학습 튜터 자료`가 내려받아지면, 그 폴더의 **`학습 튜터 설치.exe`를 더블클릭**하고 **설치**를 누르세요. (GitHub [Releases](../../releases/latest)의 `StudyTutor-Setup.exe`도 같은 파일이에요)
 Python·Git이 없으면 설치(winget)하고, 코드를 `%USERPROFILE%\study-agent`에 받고(처음엔 GitHub 로그인 창), 패키지 설치 → 자료 폴더 연결 → 바탕화면 바로가기까지 해요. 끝나면 **학습 튜터 실행** 버튼이 나와요. 다시 실행해도 안전해요.
 
 설치 마법사 원본은 `setup/installer.py`(창) + `setup/setup.ps1`(설치 단계)예요. 고친 뒤 다시 빌드해서 OneDrive의 `학습 튜터 자료`에 넣으세요:
