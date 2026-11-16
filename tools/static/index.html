@@ -487,6 +487,24 @@ dialog input:focus, dialog select:focus, #stDlg textarea:focus { outline: 0; bor
 .seg button { flex: 1; height: 30px; font-size: 13.5px; border-radius: 7px; color: var(--ink-2); }
 .seg button.on { background: var(--surface); color: var(--ink); font-weight: 650; box-shadow: 0 0 0 1px var(--rule), 0 1px 2px rgba(0,0,0,.06); }
 .dlg-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+/* AI 설정 */
+.nav-item .ai-name { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 96px; }
+body.side-collapsed .nav-item .ai-name { display: none; }
+.ai-status { margin-top: 10px; padding: 10px 12px; border-radius: 9px; background: var(--sunk); font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+.ai-status .ok { color: var(--green); font-weight: 600; }
+.ai-status .no { color: var(--red); font-weight: 600; }
+.ai-status .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ai-status .row + .row, .ai-status .row + p { margin-top: 6px; }
+.ai-status p { margin: 0; color: var(--muted); }
+.ai-status code { background: var(--code); padding: 2px 6px; border-radius: 5px; font-size: 12.5px; word-break: break-all; }
+.ai-status .btn { height: 28px; font-size: 12.5px; padding: 0 10px; }
+.ai-models { margin-top: 16px; border-top: 1px solid var(--rule); padding-top: 12px; }
+.ai-models summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.ai-models .desc { margin-top: 6px; }
+.ai-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; margin-top: 8px; }
+.ai-grid span { font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.ai-grid select { height: 32px; font-size: 13px; }
+.ai-grid select.custom { border-color: var(--pen); }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 10px 16px; border-radius: 10px; font-size: 14px; box-shadow: var(--float); z-index: 9; max-width: 80vw; white-space: pre-wrap; }
 
 /* 대화 기록 */
@@ -682,6 +700,7 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
     <button class="nav-item" data-act="review" title="복습" aria-label="복습"><span data-i="review"></span><span class="lbl">복습</span><span class="count" id="dueNum"></span></button>
     <button class="nav-item" data-act="studio" title="스튜디오" aria-label="스튜디오"><span data-i="studio"></span><span class="lbl">스튜디오</span></button>
     <button class="nav-item" data-act="history" title="대화 기록" aria-label="대화 기록"><span data-i="clock"></span><span class="lbl">대화 기록</span></button>
+    <button class="nav-item" data-act="ai" title="AI 설정 (Claude·GPT·Gemini, 요금제)" aria-label="AI 설정"><span data-i="spark"></span><span class="lbl">AI 설정</span><span class="ai-name" id="aiName"></span></button>
   </nav>
   <div class="side-label"><span>과목</span><span style="display:flex;gap:2px;margin-left:auto"><button class="icon-btn" id="icBtn" title="iClass에서 새 자료 받기" aria-label="iClass에서 새 자료 받기" style="width:28px;height:28px"><span data-i="download"></span></button><button class="icon-btn" id="addSubj" title="과목 추가" style="width:28px;height:28px"><span data-i="plus"></span></button></span></div>
   <div id="subjects"></div>
@@ -832,6 +851,34 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
   </form>
 </dialog>
 
+<dialog id="aiDlg" class="wide">
+  <form method="dialog">
+    <h3>AI 설정</h3>
+    <p class="desc">질문·퀴즈·스튜디오·채점에 쓸 AI와 요금제를 골라요. 각 서비스에 로그인한 구독으로 돌아가요.</p>
+    <label>AI</label>
+    <div class="seg" id="aiEngine"></div>
+    <div class="ai-status" id="aiStatus">확인하는 중…</div>
+    <label>요금제</label>
+    <div class="seg" id="aiPlan"></div>
+    <p class="desc" id="aiPlanDesc" style="margin-top:8px"></p>
+    <div id="aiKeyWrap" hidden>
+      <label for="aiKey">Anthropic API 키</label>
+      <input id="aiKey" type="password" autocomplete="off" placeholder="sk-ant-…">
+      <p class="desc" id="aiKeyDesc" style="margin-top:6px"></p>
+    </div>
+    <details class="ai-models" id="aiModelsBox">
+      <summary>기능별 모델 직접 고르기</summary>
+      <p class="desc">비워 두면 요금제 기본값을 써요. 바꾼 칸은 보라색 테두리로 보여요.</p>
+      <div class="ai-grid" id="aiModels"></div>
+    </details>
+    <p class="desc err" id="aiErr" hidden></p>
+    <div class="dlg-btns">
+      <button class="btn" value="cancel">취소</button>
+      <button class="btn primary" value="ok" id="aiOk">저장</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="delDlg">
   <form method="dialog">
     <h3 id="delTitle">과목 삭제</h3>
@@ -935,6 +982,7 @@ const ICONS = {
   custom: '<path d="M14.5 4.5l5 5L9 20H4v-5z"/>',
   doc: '<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5V7h3"/>',
   download: '<path d="M12 4v11M7 10.5l5 5 5-5"/><path d="M5 19.5h14"/>',
+  spark: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
 };
 const icon = (n, s = 18) => `<svg class="i" viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true">${ICONS[n] || ""}</svg>`;
 document.querySelectorAll("[data-i]").forEach(el => { el.outerHTML = icon(el.dataset.i); });
@@ -1428,8 +1476,9 @@ function renderSide() {
   const sel = $("#subjSelect"); sel.innerHTML = "";
   for (const s of state.subjects) { const o = document.createElement("option"); o.value = s.name; o.textContent = s.name; o.selected = s.name === current; sel.append(o); }
   $("#curName").textContent = current ?? "과목 없음";
+  $("#aiName").textContent = state.ai || "";
   $("#curMeta").textContent = cur ? (cur.weak.length ? `약한 주제: ${cur.weak.map(w => w[0]).join(", ")}` : `자료 ${cur.files.length}개`) : "왼쪽 + 버튼으로 과목을 만들어 주세요";
-  document.querySelectorAll("[data-act]").forEach(b => { if (!["new", "chat"].includes(b.dataset.act)) b.disabled = busy; });
+  document.querySelectorAll("[data-act]").forEach(b => { if (!["new", "chat", "ai"].includes(b.dataset.act)) b.disabled = busy; });
   updateNav();
 }
 function updateNav() {
@@ -1616,6 +1665,123 @@ function iclassLogin(reason) {
   });
 }
 
+/* ── AI 설정: 엔진(Claude·GPT·Gemini) · 요금제 · 기능별 모델 ── */
+const PLAN_DESC = {
+  claude: {
+    pro: "질문은 Sonnet, 출제·정리는 기본 모델, 채점·요약은 Haiku로 사용 한도를 아껴요.",
+    max: "질문·출제·정리에 Opus를 써요. 한도가 넉넉한 Max 요금제용이에요.",
+    api: "API 키로 쓴 만큼 결제해요. 비용을 줄이려고 Opus는 빼고 Sonnet 중심이에요. 한도에 걸리지 않아요.",
+  },
+  gpt: {
+    plus: "질문·출제·정리는 주력 모델, 질문 창·채점·요약은 빠른 모델로 한도를 아껴요.",
+    pro: "출제·정리는 최상위 모델로 깊게 생각해요. 질문도 주력 모델을 써요.",
+  },
+  gemini: {
+    free: "모두 Flash 계열로 무료 한도 안에서 써요.",
+    aipro: "질문·출제·정리는 Pro 모델, 질문 창·채점·요약은 Flash 계열이에요.",
+  },
+};
+let aiInfo = null, aiSel = null;
+async function openAI(refresh = false) {
+  const dlg = $("#aiDlg");
+  $("#aiErr").hidden = true;
+  if (!dlg.open) { $("#aiKey").value = ""; dlg.returnValue = ""; dlg.showModal(); }
+  $("#aiStatus").textContent = "설치·로그인 상태를 확인하는 중…";
+  try {
+    aiInfo = await (await api("/api/ai" + (refresh ? "?refresh=1" : ""))).json();
+  } catch (err) { $("#aiStatus").textContent = "설정을 불러오지 못했어요: " + err.message; return; }
+  if (!aiSel || !refresh) aiSel = {
+    engine: aiInfo.engine, plans: { ...aiInfo.plans },
+    models: Object.fromEntries(Object.entries(aiInfo.engines).map(([e, v]) => [e, { ...v.custom }])),
+  };
+  renderAI();
+}
+function renderAI() {
+  const e = aiSel.engine, info = aiInfo.engines[e], plan = aiSel.plans[e], st = info.status;
+  const seg = (box, items, cur, on) => {
+    box.innerHTML = "";
+    for (const [v, label] of items) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = label;
+      b.classList.toggle("on", v === cur); b.onclick = () => on(v); box.append(b);
+    }
+  };
+  seg($("#aiEngine"), Object.entries(aiInfo.engines).map(([k, v]) => [k, v.name]), e, v => { aiSel.engine = v; renderAI(); });
+  seg($("#aiPlan"), Object.entries(info.plans), plan, v => { aiSel.plans[e] = v; renderAI(); });
+  $("#aiPlanDesc").textContent = PLAN_DESC[e]?.[plan] || "";
+
+  // 설치·로그인 상태
+  const box = $("#aiStatus"), useKey = e === "claude" && plan === "api";
+  let html;
+  if (!st.installed) {
+    html = `<div class="row"><span class="no">${esc(info.cli)} 설치 안 됨</span></div>
+      <p>PowerShell에서 아래 명령으로 설치한 뒤 <b>다시 확인</b>을 눌러요.</p>
+      <div class="row"><code>${esc(st.install)}</code><button type="button" class="btn" data-ai="copy">복사</button><button type="button" class="btn" data-ai="check">다시 확인</button></div>`;
+  } else if (useKey) {
+    html = `<div class="row"><span class="ok">${esc(info.cli)} 설치됨</span></div><p>API 키 요금제는 로그인 대신 아래 API 키로 돌아가요.</p>`;
+  } else {
+    const state = st.logged_in === true ? `<span class="ok">로그인됨</span>` : st.logged_in === false ? `<span class="no">로그인 필요</span>` : `<span>${esc(info.cli)} 설치됨</span>`;
+    const planNote = e === "claude" && st.plan && st.plan !== plan ? `<p>지금 로그인된 계정은 <b>${esc(info.plans[st.plan] || st.plan)}</b> 요금제예요.</p>` : "";
+    const tip = st.logged_in === true ? "" : st.logged_in === false
+      ? `<p>로그인을 누르면 새 창이 열려요. 브라우저에서 로그인을 마친 뒤 <b>다시 확인</b>을 눌러요.</p>`
+      : `<p>로그인 상태는 앱에서 확인할 수 없어요. 처음이면 <b>로그인</b>을 눌러 한 번 로그인해 주세요.</p>`;
+    html = `<div class="row">${esc(info.cli)} · ${state}<span style="flex:1"></span>
+      <button type="button" class="btn" data-ai="login">${st.logged_in === true ? "다른 계정으로" : "로그인"}</button><button type="button" class="btn" data-ai="check">다시 확인</button></div>${planNote}${tip}`;
+  }
+  if (e === "gemini") html += `<p>Gemini 구독(무료·AI Pro)은 Antigravity CLI(agy)로 써요. Gemini CLI는 2026년 6월부터 개인 계정 로그인을 받지 않아요.</p>`;
+  box.innerHTML = html;
+  box.querySelectorAll("[data-ai]").forEach(b => b.onclick = async () => {
+    const act = b.dataset.ai;
+    if (act === "check") return openAI(true);
+    if (act === "copy") { try { await navigator.clipboard.writeText(st.install.replace(/\s+\(PowerShell\)$/, "")); toast("복사했어요"); } catch { toast("복사하지 못했어요"); } return; }
+    try { await api("/api/ai/login", { method: "POST", body: JSON.stringify({ engine: e }) }); toast("로그인 창을 열었어요. 마친 뒤 '다시 확인'을 눌러요", 4000); }
+    catch (err) { toast("로그인 창을 열지 못했어요: " + err.message); }
+  });
+
+  // Claude API 키
+  $("#aiKeyWrap").hidden = !useKey;
+  $("#aiKeyDesc").textContent = aiInfo.has_api_key
+    ? "저장된 키가 있어요. 바꿀 때만 새로 넣어요."
+    : "이 PC의 data/ai.json에만 저장돼요. 쓴 만큼 Anthropic에 요금이 청구돼요.";
+
+  // 기능별 모델
+  const grid = $("#aiModels"); grid.innerHTML = "";
+  const custom = aiSel.models[e] || (aiSel.models[e] = {});
+  for (const [kind, name] of Object.entries(aiInfo.kinds)) {
+    const lab = document.createElement("span"); lab.textContent = name;
+    const sel = document.createElement("select");
+    sel.add(new Option(`요금제 기본 · ${info.presets[plan][kind]}`, "@preset"));
+    for (const m of info.models) sel.add(new Option(m.name, m.id));
+    const cur = custom[kind] || "@preset";
+    if (![...sel.options].some(o => o.value === cur)) sel.add(new Option(cur, cur));
+    sel.value = cur; sel.classList.toggle("custom", cur !== "@preset");
+    sel.onchange = () => { if (sel.value === "@preset") delete custom[kind]; else custom[kind] = sel.value; sel.classList.toggle("custom", sel.value !== "@preset"); };
+    grid.append(lab, sel);
+  }
+  if (!info.models.length) {
+    const p = document.createElement("p"); p.className = "desc"; p.style.gridColumn = "1 / -1";
+    p.textContent = "모델 목록을 불러오지 못했어요. 설치·로그인한 뒤 '다시 확인'을 누르면 채워져요.";
+    grid.append(p);
+  }
+}
+$("#aiOk").addEventListener("click", async ev => {
+  ev.preventDefault();
+  const ok = $("#aiOk"), err = $("#aiErr");
+  const models = {};
+  for (const [e, kinds] of Object.entries(aiSel.models))
+    models[e] = Object.fromEntries(Object.keys(aiInfo.kinds).map(k => [k, kinds[k] || "@preset"]));
+  const body = { engine: aiSel.engine, plans: aiSel.plans, models };
+  if (!$("#aiKeyWrap").hidden && $("#aiKey").value.trim()) body.claude_api_key = $("#aiKey").value.trim();
+  ok.disabled = true; err.hidden = true;
+  try {
+    const r = await (await api("/api/ai", { method: "POST", body: JSON.stringify(body) })).json();
+    state.ai = r.ai; $("#aiName").textContent = r.ai;
+    $("#aiKey").value = ""; $("#aiDlg").close("ok");
+    toast(`${r.ai}로 설정했어요. 다음 질문부터 적용돼요`);
+  } catch (e) { err.textContent = e.message; err.hidden = false; }
+  finally { ok.disabled = false; }
+});
+$("#aiDlg").addEventListener("close", () => { $("#aiKey").value = ""; });
+
 async function iclassSync(subjects = [], shown = null) {
   if (busy) return toast("다른 작업이 끝난 뒤에 받을 수 있어요");
   if (rv || rl) closeReview();
@@ -1717,6 +1883,7 @@ document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
   if (a === "quiz") return openQuizSetup();
   if (a === "studio") return openStudio();
   if (a === "history") return openHistory();
+  if (a === "ai") return openAI();
   if (a === "review") return openReview();
   // 과목·자료·기록이 없으면 Claude를 부르지 않고 안내만
   const cur = state.subjects.find(s => s.name === current);

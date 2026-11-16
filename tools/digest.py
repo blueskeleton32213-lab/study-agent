@@ -4,16 +4,11 @@
     python tools/digest.py "texts/과목/파일.md" ["texts/과목/파일2.md" ...]
 출력: 파일마다 요약본 (쪽 번호 머리말 유지 → 출처를 그대로 달 수 있음)
 캐시: cache/digests/<과목>/<파일>.md — 원문(texts)이 바뀌면 다시 만든다.
-처음 만들 때는 파일당 30초~2분 걸린다 (가벼운 모델 haiku, 여러 파일은 동시에).
+처음 만들 때는 파일당 30초~2분 걸린다 (가벼운 모델: Claude haiku 등, 여러 파일은 동시에).
 """
 from __future__ import annotations
 
-import json
-import os
-import shutil
-import subprocess
 import sys
-import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -22,10 +17,8 @@ ROOT = Path(__file__).resolve().parent.parent
 TEXTS = ROOT / "texts"
 MATERIALS = ROOT / "materials"
 CACHE = ROOT / "cache" / "digests"
-CLAUDE = shutil.which("claude") or str(Path.home() / ".local" / "bin" / "claude.exe")
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 sys.path.insert(0, str(ROOT / "tools"))
-import usage  # noqa: E402
+import engines  # noqa: E402  Claude·GPT·Gemini 중 앱에서 고른 엔진 (사용량 기록도 여기서)
 
 PROMPT = """아래는 강의자료 「{name}」에서 추출한 텍스트다. 시험공부·정리 자료의 재료로 쓸 **요약본**을 만든다.
 
@@ -53,15 +46,12 @@ def source_name(md: Path) -> str:
 def make(md: Path, out: Path) -> str:
     name = source_name(md)
     prompt = PROMPT.format(name=name, text=md.read_text(encoding="utf-8"))
-    # 도구 없이, 프로젝트 밖(임시 폴더)에서 → CLAUDE.md·스킬 목록이 안 실려서 입력이 원문뿐
-    r = subprocess.run([CLAUDE, "-p", "--model", "haiku", "--tools", "", "--strict-mcp-config", "--setting-sources", "local",
-                        "--output-format", "json"], cwd=tempfile.gettempdir(), input=prompt.encode("utf-8"),
-                       capture_output=True, creationflags=NO_WINDOW, timeout=600, env={**os.environ, "STUDY_APP": "1"})
-    data = json.loads(r.stdout.decode("utf-8", errors="replace") or "{}")
-    usage.log("digest", data)
+    # 도구 없이, 프로젝트 밖(임시 폴더)에서 → CLAUDE.md·스킬 목록이 안 실려서 입력이 원문뿐.
+    # 엔진·모델은 앱의 'AI 설정'을 따른다 (요약본은 가벼운 모델)
+    data = engines.run_once("digest", prompt, timeout=600)
     body = (data.get("result") or "").strip()
     if data.get("is_error") or not body:
-        raise RuntimeError(body or r.stderr.decode("utf-8", errors="replace")[-300:] or "요약 실패")
+        raise RuntimeError(body or "요약 실패")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(f"# {name} 요약본 (원문: texts/{md.relative_to(TEXTS).as_posix()})\n\n{body}\n", encoding="utf-8")
     return out.read_text(encoding="utf-8")

@@ -1,6 +1,6 @@
-"""Claude 사용량 기록과 요약.
+"""AI 사용량 기록과 요약.
 
-앱(app.py)과 digest.py가 Claude를 부를 때마다 data/usage.jsonl에 한 줄씩 남긴다.
+앱(app.py)과 digest.py가 AI(Claude·GPT·Gemini)를 부를 때마다 data/usage.jsonl에 한 줄씩 남긴다.
 사용법:
     python tools/usage.py          # 최근 7일, 기능별 합계
     python tools/usage.py 30       # 최근 30일
@@ -18,14 +18,16 @@ KIND_NAMES = {"chat": "질문하기", "ask": "질문 창", "quiz": "퀴즈 출�
               "studio": "스튜디오", "grade": "서술형 채점", "digest": "요약본 만들기"}
 
 
-def log(kind: str, ev: dict) -> None:
-    """claude -p 의 result 이벤트(또는 --output-format json 결과)에서 사용량만 뽑아 기록한다."""
+def log(kind: str, ev: dict, engine: str = "claude") -> None:
+    """engines.py가 정리한 result 이벤트(Claude result 모양)에서 사용량만 뽑아 기록한다.
+    비용은 Claude만 알려준다 (GPT·Gemini는 0)."""
     u = ev.get("usage") or {}
     if not u:
         return
     row = {
         "t": time.strftime("%Y-%m-%d %H:%M:%S"),
         "kind": kind,
+        "engine": engine,
         "models": sorted((ev.get("modelUsage") or {}).keys()),
         "input": u.get("input_tokens", 0) + u.get("cache_creation_input_tokens", 0) + u.get("cache_read_input_tokens", 0),
         "cache_read": u.get("cache_read_input_tokens", 0),
@@ -67,7 +69,14 @@ def main() -> None:
         total += cost
         print(f"{KIND_NAMES.get(kind, kind):<12}{len(rs):>5}{inp // len(rs):>11,}{sum(r['output'] for r in rs) // len(rs):>10,}"
               f"{(sum(r['cache_read'] for r in rs) / inp if inp else 0):>10.0%}{cost:>10.3f}")
-    print(f"\n합계 ${total:.3f}  (구독 요금제면 실제 청구액이 아니라 사용 한도 소모량의 참고치)")
+    print(f"\n합계 ${total:.3f}  (Claude만 계산됨. 구독 요금제면 실제 청구액이 아니라 사용 한도 소모량의 참고치)")
+    engines: dict[str, int] = {}
+    for r in rows:
+        e = r.get("engine", "claude")
+        engines[e] = engines.get(e, 0) + 1
+    if len(engines) > 1 or "claude" not in engines:
+        names = {"claude": "Claude", "gpt": "GPT", "gemini": "Gemini"}
+        print("엔진별 횟수: " + ", ".join(f"{names.get(e, e)} {n}회" for e, n in engines.items()))
 
 
 if __name__ == "__main__":

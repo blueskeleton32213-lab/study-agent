@@ -1,7 +1,7 @@
 # 학습 튜터
 
 내 강의자료(PDF·PPTX·DOCX)를 근거로 질문에 답하고, 퀴즈를 내고, 틀린 문제를 간격반복으로 다시 물어보는 개인 공부용 앱이에요.
-[Claude Code](https://claude.com/claude-code)를 엔진으로 쓰기 때문에 Claude 구독 안에서 추가 요금 없이 돌아가요.
+AI 엔진은 **Claude**([Claude Code](https://claude.com/claude-code)), **GPT**([Codex CLI](https://github.com/openai/codex)), **Gemini**([Antigravity CLI](https://antigravity.google/docs/cli/headless/)) 중에서 골라요. 각 서비스에 로그인한 구독으로 돌아가서 추가 요금이 없어요 (Claude는 API 키 요금제도 가능).
 
 ## 기능
 | 메뉴 | 하는 일 |
@@ -9,19 +9,24 @@
 | 질문하기 | 강의자료에서 찾아 답해요. 출처는 평소 숨기고(헤더 「출처 표시」로 켜기), 문장을 드래그하면 참조한 자료가 떠요. 누르면 원본 쪽이 가운데 큰 창으로 열려요(확대·폭 맞춤·옆에 두기). 구조·흐름처럼 그림이 필요한 설명은 원본 쪽 이미지나 다이어그램(mermaid)으로 보여줘요 |
 | 질문 창 | 퀴즈·정리 자료·답변에서 드래그 → 「이 부분 물어보기」로 보던 화면 그대로 바로 물어봐요 |
 | 퀴즈 | 범위·난이도·유형을 골라 출제해요. **시험 스타일**을 고르면 과목의 중간고사·기출·문제지 형식을 분석해서 그대로 따라 내요. 교수님 출제 스타일을 직접 적을 수도 있어요. 만든 퀴즈는 **퀴즈 기록**에 남아서 이어 풀거나 결과·해설을 다시 볼 수 있어요 |
-| 복습 | 틀린 문제가 카드로 쌓이고, SM-2 간격반복으로 다시 물어봐요 (Claude 호출 없이 바로 처리). 복습할 때마다 **복습 기록**에 남고, 헷갈린 카드만 다시 볼 수 있어요 |
+| 복습 | 틀린 문제가 카드로 쌓이고, SM-2 간격반복으로 다시 물어봐요 (AI 호출 없이 바로 처리). 복습할 때마다 **복습 기록**에 남고, 헷갈린 카드만 다시 볼 수 있어요 |
 | 스튜디오 | 시험대비 요약, 핵심 공식표, 기출 유형 분석, 용어집을 만들어 저장하고 인쇄·PDF로 내보내요 |
 | 대화 기록 | 대화를 자동 저장하고, 과목별로 거르거나 검색해서 다시 열어 이어갈 수 있어요 |
+| AI 설정 | 사이드바 **AI 설정**에서 엔진(Claude·GPT·Gemini)과 요금제(Claude Pro/Max/API 키, GPT Plus/Pro, Gemini 무료/AI Pro)를 골라요. 요금제마다 기능별 모델이 정해져 있고, 기능별로 직접 바꿀 수도 있어요. 로그인 창 열기·설치 안내도 여기서 해요 (설정 파일: `data/ai.json`) |
 | iClass 받기 | 인하대 iClass에서 수강 과목의 새 강의자료(PDF·PPTX·DOCX)를 받아요. 사이드바 ↓ 버튼이나 대화창에 "최신으로 받아줘". 비밀번호는 저장하지 않고 로그인 쿠키만 `data/`에 남겨요 (터미널: `python tools/iclass.py login` / `sync`) |
 
-**토큰 절약:** 앱이 부르는 Claude에는 튜터에 필요한 도구만 싣고, 질문은 Sonnet·채점은 Haiku로 처리해요. 과목 목차(`cache/목차/`)와 강의별 요약본(`tools/digest.py`, 한 번 만들고 재사용)을 먼저 보고 필요한 쪽만 원문으로 읽어요. 과목이 바뀌거나 대화가 길어지면 새 대화를 권해요. 사용량은 `python tools/usage.py`로 확인해요.
+**토큰 절약:** 앱이 부르는 AI에는 튜터에 필요한 도구만 싣고, 요금제에 맞춰 가벼운 일(채점·요약본)은 가벼운 모델로 처리해요 (예: Claude Pro는 질문 Sonnet·채점 Haiku). 과목 목차(`cache/목차/`)와 강의별 요약본(`tools/digest.py`, 한 번 만들고 재사용)을 먼저 보고 필요한 쪽만 원문으로 읽어요. 과목이 바뀌거나 대화가 길어지면 새 대화를 권해요. 사용량은 `python tools/usage.py`로 확인해요.
 
 그 밖에: 낮·밤 모드, 사이드바 접기(Ctrl+B), 과목 순서 끌어서 바꾸기, 과목 클릭으로 자료 목록 보기, 과목 삭제(Windows 휴지통으로 이동, 복원 가능).
 
 ## 필요한 것
 - Windows 10/11 (WebView2 런타임, 기본 설치돼 있음)
 - Python 3.12 이상
-- [Claude Code](https://claude.com/claude-code) 설치 및 로그인 (`claude` 명령이 동작해야 해요)
+- 쓸 AI의 CLI 설치 및 로그인 (하나 이상, 앱의 **AI 설정**에서 상태 확인·로그인 창 열기)
+  - Claude: [Claude Code](https://claude.com/claude-code) — `npm install -g @anthropic-ai/claude-code`
+  - GPT: Codex CLI — `npm install -g @openai/codex` 후 `codex login` (ChatGPT Plus/Pro 계정)
+  - Gemini: Antigravity CLI — PowerShell에서 `irm https://antigravity.google/cli/install.ps1 | iex` 후 `agy`를 한 번 실행해 로그인 (Gemini CLI는 2026년 6월부터 개인 구독 로그인을 지원하지 않아요)
+  - Claude가 가장 잘 맞춰져 있어요. GPT·Gemini는 같은 규칙(`CLAUDE.md`)과 스킬 파일을 읽게 해 두었지만 출처 표기·형식이 조금 다를 수 있어요.
 
 ## 설치
 ```powershell
@@ -51,7 +56,7 @@ python -m PyInstaller --noconfirm --onefile --noconsole --icon "$PWD\tools\stati
 
 ## 폴더 구조
 ```
-CLAUDE.md              튜터 규칙 (Claude Code가 읽음)
+CLAUDE.md              튜터 규칙 (Claude Code가 읽고, Codex·Antigravity에도 넘겨줌)
 .claude/skills/        터미널용 스킬: /ingest /quiz /review /weak, 그림 규칙(figure)
 .claude/settings.json  앱에서 쓰는 도구 권한
 tools/
@@ -60,7 +65,8 @@ tools/
   extract.py           PDF·PPTX·DOCX → texts/ (쪽 번호, Word 수식은 LaTeX로)
   render.py            PDF 쪽 → 이미지 (수식·그림 확인용)
   digest.py            강의자료 요약본 (파일마다 한 번 만들어 재사용)
-  usage.py             Claude 사용량 기록·요약
+  engines.py           AI 엔진(Claude·GPT·Gemini) 실행·요금제별 모델 (설정: data/ai.json)
+  usage.py             AI 사용량 기록·요약
   srs.py               복습 카드·간격반복(SM-2)
   static/index.html    화면
 ```

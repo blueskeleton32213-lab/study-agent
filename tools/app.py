@@ -12,7 +12,6 @@ import os
 import re
 import shutil
 import subprocess
-import tempfile
 import sys
 import threading
 import time
@@ -36,25 +35,11 @@ sys.path.insert(0, str(TOOLS))
 import srs  # noqa: E402  복습 카드는 Claude 없이 직접 처리
 
 srs_lock = threading.Lock()
-CLAUDE = shutil.which("claude") or str(Path.home() / ".local" / "bin" / "claude.exe")
 PYTHON = sys.executable.replace("pythonw.exe", "python.exe")
-# 앱이 띄우는 Claude 표시: 작업 기록 Stop 훅(.claude/hooks/worklog_check.py)이 공부 대화에선 끼어들지 않게
-CLAUDE_ENV = {**os.environ, "STUDY_APP": "1"}
-import usage  # noqa: E402  기능별 사용량 기록 (data/usage.jsonl, 요약은 python tools/usage.py)
-
-# ── 토큰 절약 ──
-# 앱이 띄우는 Claude에는 튜터에 필요한 도구만 주고, 개인 커넥터(MCP)·개인 스킬은 싣지 않는다.
-# (측정: 같은 질문 하나에 입력 약 27,000 → 15,600 토큰)
-CLAUDE_TOOLS = "Read,Grep,Glob,Bash,Skill"
-# 일마다 모델: None = 기본 모델(품질이 중요한 출제·정리), 질문은 sonnet, 단순한 채점은 haiku
-MODELS = {"chat": "sonnet", "ask": "sonnet", "quiz": None, "studio": None, "grade": "haiku"}
-
-
-def claude_cmd(kind: str, tools: str = CLAUDE_TOOLS) -> list[str]:
-    cmd = [CLAUDE, "-p", "--strict-mcp-config", "--setting-sources", "project,local", "--tools", tools]
-    if MODELS.get(kind):
-        cmd += ["--model", MODELS[kind]]
-    return cmd
+# AI 엔진(Claude Code / Codex / Antigravity)·요금제·기능별 모델은 engines.py와 data/ai.json ('AI 설정' 창).
+# 앱이 띄우는 AI에는 튜터에 필요한 도구만 주고 개인 커넥터·스킬은 싣지 않는다 (토큰 절약).
+# 사용량은 engines.py가 data/usage.jsonl에 기록 (요약: python tools/usage.py)
+import engines  # noqa: E402
 
 def code_version() -> float:
     """서버 코드(tools/*.py)의 최신 수정 시각. 실행 중에 코드가 바뀌면 launch.pyw가 서버를 교체한다."""
@@ -277,7 +262,8 @@ def app_state() -> dict:
         s = stats.get(name, {})
         subjects.append({"name": name, "files": files, "cards": s.get("카드수", 0),
                          "due": s.get("오늘복습", 0), "weak": s.get("자주틀린주제", [])[:3]})
-    return {"subjects": subjects, "due": sum(s["due"] for s in subjects), "syncing": is_syncing}
+    return {"subjects": subjects, "due": sum(s["due"] for s in subjects), "syncing": is_syncing,
+            "ai": engines.current_name()}
 
 
 # ───────────────────────── 출처 보기 ─────────────────────────
@@ -382,78 +368,58 @@ def tool_label(name: str, inp: dict) -> str:
             return "원본 쪽 그림으로 확인"
         if "digest.py" in cmd:
             return "요약본 읽는 중 (처음이면 만드는 중)"
+        # GPT(Codex)는 검색·읽기도 셸 명령으로 한다
+        if re.search(r"\b(rg|grep|Select-String|findstr)\b", cmd):
+            m = re.search(r"""(?:rg|grep|Select-String(?:\s+-Pattern)?|findstr)\s+(?:-\S+\s+)*["']([^"']+)["']""", cmd)
+            return f"자료 검색: {m.group(1) if m else ''}"[:80]
+        if re.search(r"\b(Get-Content|cat|sed|head|tail|type)\b", cmd):
+            m = re.findall(r"[\w가-힣 .\-]+\.(?:md|txt|json|py)", cmd)
+            return f"읽는 중: {Path(m[-1].strip()).name}" if m else "자료 읽는 중"
+        if re.search(r"\b(ls|dir|Get-ChildItem|find)\b", cmd):
+            return "자료 목록 확인"
         return "명령 실행"
     if name == "Skill":
         return f"스킬 실행: {inp.get('skill', '')}"
     if name == "StructuredOutput":
         return "문제 정리 중"
+    # Gemini(Antigravity) 도구 이름은 엔진마다 달라서 뜻으로 묶는다
+    low = name.lower()
+    vals = [v for v in inp.values() if isinstance(v, str)] if isinstance(inp, dict) else []
+    first = vals[0] if vals else ""
+    if any(w in low for w in ("command", "shell", "terminal")):
+        return tool_label("Bash", {"command": inp.get("command") or inp.get("CommandLine") or first})
+    if any(w in low for w in ("grep", "search", "find")):
+        return f"자료 검색: {first}"[:80]
+    if any(w in low for w in ("view", "read")):
+        return f"읽는 중: {Path(first).name}" if first else "자료 읽는 중"
+    if "list" in low or "dir" in low:
+        return "자료 목록 확인"
+    if low == "web_search":
+        return "웹 검색"
     return name
 
 
-def stream_claude(message: str, session_id: str | None, send, extra: list[str] | None = None,
+def stream_claude(message: str, session_id: str | None, send, schema: dict | None = None,
                   on_result=None, slot: str = "chat", kind: str | None = None) -> None:
-    """claude -p 를 실행하며 이벤트를 send로 흘려보낸다. on_result가 있으면 result 이벤트를 넘겨준다.
-    kind: 사용량 기록·모델 선택용 이름 (없으면 slot)"""
-    kind = kind or slot
-    cmd = [*claude_cmd(kind), "--output-format", "stream-json", "--verbose", "--include-partial-messages", *(extra or [])]
-    if session_id:
-        cmd += ["--resume", session_id]
-    proc = subprocess.Popen(cmd, cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, creationflags=NO_WINDOW, env=CLAUDE_ENV)
+    """설정에서 고른 AI 엔진을 실행하며 이벤트를 send로 흘려보낸다. on_result가 있으면 result 이벤트를 넘겨준다.
+    schema: 답을 이 JSON 모양으로 받는다 (result의 structured_output). kind: 모델 선택·사용량 기록용 이름 (없으면 slot)"""
+    run = engines.start(kind or slot, message, session_id, schema)
+    proc = run.proc
     with state_lock:
         procs[slot] = proc
-    proc.stdin.write(message.encode("utf-8"))
-    proc.stdin.close()
-
-    had_text = False
-    tool_inputs: dict[int, dict] = {}
-    got_result = False
     try:
-        for raw in proc.stdout:
-            try:
-                ev = json.loads(raw.decode("utf-8", errors="replace"))
-            except json.JSONDecodeError:
-                continue
-            t = ev.get("type")
-            if t == "system" and ev.get("subtype") == "init":
-                send({"type": "session", "session_id": ev.get("session_id")})
-            elif t == "stream_event" and ev.get("parent_tool_use_id") is None:
-                e = ev["event"]
-                et = e.get("type")
-                if et == "content_block_start":
-                    block = e["content_block"]
-                    if block["type"] == "text" and had_text:
-                        send({"type": "text", "delta": "\n\n"})
-                    elif block["type"] == "tool_use":
-                        tool_inputs[e["index"]] = {"name": block["name"], "json": ""}
-                elif et == "content_block_delta":
-                    d = e["delta"]
-                    if d["type"] == "text_delta":
-                        had_text = True
-                        send({"type": "text", "delta": d["text"]})
-                    elif d["type"] == "input_json_delta" and e["index"] in tool_inputs:
-                        tool_inputs[e["index"]]["json"] += d["partial_json"]
-                elif et == "content_block_stop" and e.get("index") in tool_inputs:
-                    tu = tool_inputs.pop(e["index"])
-                    try:
-                        inp = json.loads(tu["json"] or "{}")
-                    except json.JSONDecodeError:
-                        inp = {}
-                    send({"type": "tool", "label": tool_label(tu["name"], inp)})
+        for ev in run.events():
+            t = ev["type"]
+            if t == "tool":
+                send({"type": "tool", "label": tool_label(ev["name"], ev.get("input") or {})})
             elif t == "result":
-                got_result = True
-                usage.log(kind, ev)
                 if on_result:
                     on_result(ev)
                 if ev.get("is_error"):
                     send({"type": "error", "message": str(ev.get("result") or ev.get("subtype"))})
-                send({"type": "done", "session_id": ev.get("session_id")})
-        proc.wait()
-        if not got_result:
-            err = proc.stderr.read().decode("utf-8", errors="replace").strip()
-            if proc.returncode not in (0, None) and err:
-                send({"type": "error", "message": err[-800:]})
-            send({"type": "done", "session_id": session_id})
+                send({"type": "done", "session_id": ev.get("session_id") or session_id})
+            else:
+                send(ev)
     finally:
         with state_lock:
             if procs.get(slot) is proc:
@@ -628,18 +594,16 @@ feedback: 존댓말 2~3문장. 학생 답에서 맞은 점과 틀린/빠진 점�
 확인 질문, 복습 카드 저장 제안, "자료를 확인하지 않았다" 같은 말은 쓰지 않는다.
 missing: 학생 답에 빠진 핵심 키워드 (없으면 빈 배열)."""
     # 채점은 문제·답만 보면 되니 도구 없이, CLAUDE.md도 안 읽히게 프로젝트 밖(임시 폴더)에서 실행
-    r = subprocess.run([*claude_cmd("grade", tools=""), "--output-format", "json", "--json-schema", json.dumps(GRADE_SCHEMA)],
-                       cwd=tempfile.gettempdir(), input=prompt.encode("utf-8"), capture_output=True, creationflags=NO_WINDOW,
-                       timeout=180, env=CLAUDE_ENV)
     try:
-        data = json.loads(r.stdout.decode("utf-8", errors="replace"))
-        usage.log("grade", data)
-        res = data.get("structured_output")
-        if not res:
-            raise ValueError(data.get("result") or "채점 결과가 비어 있어요")
-        return res
-    except json.JSONDecodeError:
-        raise ValueError((r.stderr or r.stdout).decode("utf-8", errors="replace")[-500:] or "채점 실패")
+        data = engines.run_once("grade", prompt, schema=GRADE_SCHEMA, timeout=180)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        raise ValueError(str(exc))
+    res = data.get("structured_output")
+    if not res or res.get("verdict") not in ("correct", "partial", "wrong"):
+        raise ValueError(str(data.get("result") or "채점 결과가 비어 있어요")[-500:])
+    res.setdefault("feedback", "")
+    res["missing"] = res.get("missing") or []
+    return res
 
 
 # ───────────────────────── 스튜디오 (정리 자료 만들기) ─────────────────────────
@@ -950,6 +914,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(info)
             except (ValueError, KeyError) as exc:
                 self._json({"error": str(exc)}, 400)
+        elif path == "/api/ai":  # AI 설정 창: 엔진·요금제·기능별 모델·설치/로그인 상태
+            if parse_qs(urlparse(self.path).query).get("refresh"):
+                for e in engines.ENGINES:
+                    engines.list_models(e, refresh=True)
+            self._json(engines.summary())
         elif path == "/api/chats":
             self._json({"chats": chat_list()})
         elif path == "/api/chats/get":
@@ -1041,6 +1010,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(r, 200 if r["ok"] else 401)
             if url.path == "/api/iclass/sync":
                 return self._iclass_sync()
+            if url.path == "/api/ai":  # AI 설정 저장
+                data = json.loads(self._body())
+                engines.save(data)
+                data.clear()  # API 키를 메모리에 오래 두지 않는다
+                return self._json({"ok": True, "ai": engines.current_name()})
+            if url.path == "/api/ai/login":  # 로그인 창(새 콘솔) 띄우기
+                engine = json.loads(self._body()).get("engine")
+                if engine not in engines.ENGINES:
+                    raise ValueError(f"알 수 없는 엔진: {engine}")
+                engines.open_login(engine)
+                return self._json({"ok": True})
             if url.path == "/api/grade":
                 data = json.loads(self._body())
                 if data["button"] not in srs.BUTTONS:
@@ -1059,7 +1039,7 @@ class Handler(BaseHTTPRequestHandler):
                 data = json.loads(self._body())
                 try:
                     return self._json(grade_answer(data["question"], data["user_answer"]))
-                except (ValueError, subprocess.TimeoutExpired) as exc:
+                except ValueError as exc:
                     return self._json({"error": f"채점 실패: {exc}"}, 502)
             if url.path == "/api/quiz/save":
                 data = json.loads(self._body())
@@ -1231,7 +1211,6 @@ class Handler(BaseHTTPRequestHandler):
         sync_materials()
         send = self._sender("quiz")
         result = {}
-        extra = ["--json-schema", json.dumps(QUIZ_SCHEMA)]
 
         def forward(ev):  # 출제 중에는 진행 상황(도구 사용)만 보여주고 중간 글은 숨긴다
             if ev["type"] not in ("text", "done", "session"):
@@ -1247,7 +1226,7 @@ class Handler(BaseHTTPRequestHandler):
                     send({"type": "tool", "label": f"시험 스타일 분석 중 (자료 {len(info['files'])}개, 처음 한 번)"})
                     sres = {}
                     stream_claude(style_prompt(subject, info["files"]), None, forward,
-                                  ["--json-schema", json.dumps(STYLE_SCHEMA)], on_result=sres.update, slot="quiz", kind="style")
+                                  STYLE_SCHEMA, on_result=sres.update, slot="quiz", kind="style")
                     guide = (sres.get("structured_output") or {}).get("guide") or guide
                     if guide and (sres.get("structured_output") or {}).get("guide"):
                         save_style(subject, guide, info["sig"])
@@ -1255,7 +1234,7 @@ class Handler(BaseHTTPRequestHandler):
                 send({"type": "style", "used": bool(guide or note), "files": len(info["files"]), "note": bool(note)})
             prompt = quiz_prompt(subject, (data.get("scope") or "").strip(), n, data.get("level", "보통"),
                                  data.get("qtype", "mix"), guide, note)
-            stream_claude(prompt, None, forward, extra, on_result=result.update, slot="quiz")
+            stream_claude(prompt, None, forward, QUIZ_SCHEMA, on_result=result.update, slot="quiz")
             qs = clean_questions((result.get("structured_output") or {}).get("questions") or [])
             if qs:
                 # 화면을 닫거나 다른 퀴즈를 보고 있어도 남도록 서버에서 바로 기록한다
@@ -1291,7 +1270,7 @@ class Handler(BaseHTTPRequestHandler):
                 send(ev)
         try:
             stream_claude(studio_prompt(subject, kind, scope, custom), None, forward,
-                          ["--json-schema", json.dumps(DOC_SCHEMA)], on_result=result.update, slot="studio")
+                          DOC_SCHEMA, on_result=result.update, slot="studio")
             doc = result.get("structured_output") or {}
             if doc.get("markdown"):
                 title = doc.get("title") or STUDIO_TYPES.get(kind, ("직접 요청",))[0]
@@ -1335,11 +1314,16 @@ class Handler(BaseHTTPRequestHandler):
 
         sync_materials()  # 탐색기로 넣거나 지운 자료를 먼저 반영
         session_id = data.get("session_id")
+        engine = engines.load()["engine"]
         try:
-            if not session_id:
+            if session_id and engines.session_engine(session_id) != engine:
+                # 다른 AI로 하던 대화: 이어갈 수 없으니 화면에 저장된 최근 대화를 붙여서 새로 시작
+                send({"type": "tool", "label": f"{engines.current_name()}로 이어서 답해요 (최근 대화를 붙여 새로 시작)"})
+                stream_claude(with_context(message, data.get("context") or []), None, send, slot=slot)
+            elif not session_id:
                 stream_claude(message, None, send, slot=slot)
             else:
-                # 이어가기: 폴더를 옮겼거나 Claude 쪽 대화가 사라졌으면 --resume이 실패한다.
+                # 이어가기: 폴더를 옮겼거나 AI 쪽 대화가 사라졌으면 이어가기가 실패한다.
                 # 실패를 바로 보여주지 않고, 화면에 저장된 최근 대화를 붙여서 새 대화로 다시 시작한다.
                 held, got_text, result = [], {"v": False}, {}
 
@@ -1351,7 +1335,12 @@ class Handler(BaseHTTPRequestHandler):
                         return
                     send(ev)
                 stream_claude(message, session_id, guard, on_result=result.update, slot=slot)
-                failed = not got_text["v"] and result.get("is_error") and "No conversation found" in str(result.get("errors") or result.get("result") or "")
+                err = str(result.get("errors") or result.get("result") or "")
+                # Claude는 "No conversation found"로 알 수 있고, 다른 엔진은 글 없이 실패하면 이어가기 실패로 본다
+                # (로그인·한도 문제는 다시 해도 같은 오류가 나서 그대로 보인다)
+                failed = not got_text["v"] and result.get("is_error") and (
+                    "No conversation found" in err if engine == "claude"
+                    else not re.search(r"login|auth|limit|quota|한도|로그인", err, re.I))
                 if failed:
                     send({"type": "tool", "label": "이전 대화를 이어갈 수 없어서 최근 내용을 붙여 새로 시작해요"})
                     stream_claude(with_context(message, data.get("context") or []), None, send, slot=slot)
@@ -1359,7 +1348,7 @@ class Handler(BaseHTTPRequestHandler):
                     for ev in held:
                         send(ev)
         except Exception as exc:
-            send({"type": "error", "message": f"Claude 실행 실패: {exc}"})
+            send({"type": "error", "message": f"AI 실행 실패: {exc}"})
             send({"type": "done", "session_id": session_id})
         self.close_connection = True
 
