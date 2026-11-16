@@ -818,12 +818,16 @@ sync_lock = threading.Lock()
 
 def materials_out_of_sync() -> bool:
     """탐색기로 직접 넣은 파일(추출 안 됨·원본이 더 새것)이나 지운 파일(추출본만 남음)이 있으면 True."""
+    received = onedrive_sync.received_files()
     for src in MATERIALS.rglob("*") if MATERIALS.exists() else []:
         if src.suffix.lower() in ALLOWED_EXT:
             md = TEXTS / src.relative_to(MATERIALS).with_suffix(".md")
-            # 탐색기로 복사한 파일은 수정 시각이 옛날 그대로라, 복사된 시각(ctime)도 함께 본다
+            # 탐색기로 복사한 파일은 수정 시각이 옛날 그대로라, 복사된 시각(ctime)도 함께 본다.
+            # OneDrive에서 받아 온 자료는 예외: 받을 때 ctime이 지금으로 바뀌지만 추출본도 같이 받아 오므로 수정 시각만 본다
             st = src.stat()
-            if not md.exists() or md.stat().st_mtime < max(st.st_mtime, st.st_ctime):
+            rel = "materials/" + src.relative_to(MATERIALS).as_posix()
+            got = onedrive_sync.same(received.get(rel), (st.st_size, int(st.st_mtime)))
+            if not md.exists() or md.stat().st_mtime < (st.st_mtime if got else max(st.st_mtime, st.st_ctime)):
                 return True
     for md in TEXTS.rglob("*.md") if TEXTS.exists() else []:
         rel = md.relative_to(TEXTS)

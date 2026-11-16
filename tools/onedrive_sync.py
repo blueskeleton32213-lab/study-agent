@@ -40,6 +40,23 @@ Stat = tuple[int, int]  # (크기, 수정 시각 초)
 last_message = ""  # 마지막 로그 한 줄 (앱이 결과를 보여 줄 때 쓴다)
 
 
+_received_cache: tuple[float, dict[str, Stat]] = (-1.0, {})
+
+
+def received_files() -> dict[str, Stat]:
+    """OneDrive에서 받아 온 뒤 이 컴퓨터에서 바뀌지 않은 파일들 {상대경로: (크기, 수정 시각)}.
+    받아 오면 파일을 만든 시각(ctime)이 지금으로 바뀌어서, 앱이 '탐색기로 새로 넣은 자료'로 착각하지 않게 쓴다."""
+    global _received_cache
+    try:
+        mtime = STATE.stat().st_mtime
+        if mtime != _received_cache[0]:
+            data = json.loads(STATE.read_text(encoding="utf-8")).get("received", {})
+            _received_cache = (mtime, {k: tuple(v) for k, v in data.items()})
+        return _received_cache[1]
+    except Exception:
+        return {}
+
+
 def enabled() -> bool:
     """이 컴퓨터에서 OneDrive 동기화를 켰는지. 고른 적이 없으면 OneDrive 폴더가 있을 때 켜짐."""
     try:
@@ -112,7 +129,14 @@ class Sync:
     def __init__(self, log) -> None:
         self.log = log
         self.stamp = time.strftime("%Y%m%d-%H%M%S")
+        self.received: dict[str, Stat] = {}  # OneDrive에서 받은 파일 (앱이 '새로 넣은 자료'로 보고 다시 추출하지 않게)
         self.counts = {"올림": 0, "받음": 0, "지움(OneDrive)": 0, "지움(이 컴퓨터)": 0, "충돌": 0, "실패": 0}
+
+    def receive(self, rel: str) -> Stat:
+        st = copy(REMOTE / rel, ROOT / rel)
+        if st != DIR:
+            self.received[rel] = st
+        return st
 
     def backup(self, rel: str, src: Path, move: bool) -> None:
         dst = BACKUP / self.stamp / rel
@@ -134,9 +158,11 @@ class Sync:
 
     def run(self) -> int:
         try:
-            base: dict[str, Stat] = {k: tuple(v) for k, v in json.loads(STATE.read_text(encoding="utf-8"))["files"].items()}
+            saved = json.loads(STATE.read_text(encoding="utf-8"))
+            base: dict[str, Stat] = {k: tuple(v) for k, v in saved["files"].items()}
+            received_before = {k: tuple(v) for k, v in saved.get("received", {}).items()}
         except Exception:
-            base = {}
+            base, received_before = {}, {}
         local, remote = scan(ROOT), scan(REMOTE)
         new: dict[str, Stat] = {}
         dirs_local: list[tuple[Path, str]] = []
@@ -158,11 +184,11 @@ class Sync:
                         self.remove(ROOT, rel, dirs_local); res = None
                         self.counts["지움(이 컴퓨터)"] += l != DIR
                     else:
-                        res = copy(REMOTE / rel, ROOT / rel); self.counts["받음"] += r != DIR
+                        res = self.receive(rel); self.counts["받음"] += r != DIR
                 elif same(l, r):
                     res = l
                 elif l is None:
-                    res = copy(REMOTE / rel, ROOT / rel); self.counts["받음"] += 1
+                    res = self.receive(rel); self.counts["받음"] += 1
                 elif r is None:
                     res = copy(ROOT / rel, REMOTE / rel); self.counts["올림"] += 1
                 elif DIR in (l, r):
@@ -175,7 +201,7 @@ class Sync:
                         self.log(f"[충돌] {rel}: 이 컴퓨터 것을 남김 (OneDrive 것은 sync_backup/{self.stamp})")
                     else:
                         self.backup(rel, ROOT / rel, move=False)
-                        res = copy(REMOTE / rel, ROOT / rel)
+                        res = self.receive(rel)
                         self.log(f"[충돌] {rel}: OneDrive 것을 남김 (이 컴퓨터 것은 sync_backup/{self.stamp})")
             except OSError as exc:  # 열려 있거나 OneDrive가 잡고 있는 파일 → 다음에 다시
                 self.counts["실패"] += 1
@@ -192,7 +218,10 @@ class Sync:
                         new[rel] = DIR
         STATE.parent.mkdir(parents=True, exist_ok=True)
         tmp = STATE.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"when": self.stamp, "files": new}, ensure_ascii=False), encoding="utf-8")
+        # 받은 파일 기록: 그 뒤로 이 컴퓨터에서 바뀌지 않은 것만 남긴다
+        received = {k: v for k, v in received_before.items() if k in new and same(new[k], v)} | self.received
+        tmp.write_text(json.dumps({"when": self.stamp, "files": new, "received": received}, ensure_ascii=False),
+                       encoding="utf-8")
         os.replace(tmp, STATE)
         done = ", ".join(f"{k} {v}" for k, v in self.counts.items() if v)
         self.log(f"동기화 끝: {done or '바뀐 것 없음'}")
