@@ -20,7 +20,7 @@ def main() -> None:
     if len(sys.argv) != 3:
         sys.exit(__doc__)
     pdf = (ROOT / sys.argv[1]).resolve()
-    if not pdf.is_relative_to(ROOT / "materials") or pdf.suffix.lower() != ".pdf" or not pdf.exists():
+    if not pdf.is_relative_to((ROOT / "materials").resolve()) or pdf.suffix.lower() != ".pdf" or not pdf.exists():
         sys.exit(f"materials/ 안의 PDF가 아닙니다: {sys.argv[1]}")
     a, _, b = sys.argv[2].partition("-")
     first, last = int(a), int(b or a)

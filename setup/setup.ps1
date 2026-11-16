@@ -1,6 +1,6 @@
 ﻿# 새 컴퓨터에 학습 튜터 설치. 설치 마법사(학습 튜터 설치.exe, setup/installer.py)가 -Wizard 로 부른다.
 # 1) Python·Git이 없으면 winget으로 설치  2) GitHub에서 코드 받기(이미 있으면 최신으로)
-# 3) 패키지 설치  4) 개인 자료 폴더를 OneDrive와 연결  5) 바탕화면 바로가기  6) 실행
+# 3) 패키지 설치  4) 개인 자료를 OneDrive에서 받아오기  5) 바탕화면 바로가기  6) 실행
 # -Wizard: 멈춰서 기다리지 않고, 마지막 실행은 마법사가 한다 (LAUNCH| 줄로 알려줌)
 param([switch]$Wizard)
 $ErrorActionPreference = "Stop"
@@ -52,9 +52,10 @@ try {
     python -m pip install --disable-pip-version-check -q -r (Join-Path $dir "requirements.txt") | Out-Host
     if ($LASTEXITCODE) { Fail "패키지 설치에 실패했어요." }
 
-    Step "개인 자료(OneDrive) 연결"
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $dir "tools\link_onedrive.ps1") | Out-Host
-    if ($LASTEXITCODE) { Fail "OneDrive 연결에 실패했어요. OneDrive 동기화가 끝났는지 확인해 주세요." }
+    Step "개인 자료를 OneDrive에서 받아오기"
+    New-Item -ItemType Directory -Force (Join-Path $dir "local") | Out-Null
+    python (Join-Path $dir "tools\onedrive_sync.py") | Out-Host
+    if ($LASTEXITCODE) { Fail "OneDrive에서 자료를 받지 못했어요. OneDrive 동기화가 끝났는지 확인해 주세요." }
 
     Step "바탕화면 바로가기 만들기"
     $pythonw = Join-Path (Split-Path (& python -c "import sys; print(sys.executable)")) "pythonw.exe"

@@ -271,11 +271,14 @@ CACHE_HD = ROOT / "cache" / "hd"
 
 
 def material_path(rel: str) -> Path:
-    """materials/ 안의 파일만 허용."""
+    """materials/ 안의 파일만 허용.
+    materials/가 정션·링크일 수도 있어서 resolve()하면 실제 경로가 달라지므로,
+    검사는 실제 경로끼리 하고 돌려줄 땐 MATERIALS 기준 경로로 되돌린다 (relative_to(MATERIALS)가 깨지지 않게)."""
+    real = MATERIALS.resolve()
     p = (MATERIALS / rel).resolve()
-    if not p.is_relative_to(MATERIALS.resolve()) or not p.is_file() or p.suffix.lower() not in ALLOWED_EXT:
+    if not p.is_relative_to(real) or not p.is_file() or p.suffix.lower() not in ALLOWED_EXT:
         raise ValueError(f"자료를 찾을 수 없어요: {rel}")
-    return p
+    return MATERIALS / p.relative_to(real)
 
 
 def norm(s: str) -> str:

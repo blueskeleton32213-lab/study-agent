@@ -46,6 +46,16 @@ def sync_push() -> None:
     if ahead and ahead.returncode == 0 and ahead.stdout.strip() not in ("", "0"):
         git("push", "--quiet", timeout=30)
 
+
+def sync_onedrive() -> None:
+    """개인 자료 폴더를 OneDrive와 맞춘다 (켤 때 받고, 끌 때 올림). 실패해도 앱은 그대로 쓴다."""
+    try:
+        sys.path.insert(0, str(TOOLS))
+        import onedrive_sync
+        onedrive_sync.main()
+    except Exception:
+        pass
+
 user32 = ctypes.windll.user32
 user32.FindWindowW.restype = ctypes.c_void_p
 user32.LoadImageW.restype = ctypes.c_void_p
@@ -101,6 +111,7 @@ if server_up() and stale_server():
         time.sleep(0.5)
 
 if not server_up():
+    sync_onedrive()  # 다른 컴퓨터에서 바뀐 공부 기록·자료 받기 (서버가 파일을 쓰기 전에)
     if FROZEN:  # 서버·도구는 설치된 Python으로 돌린다 (tools/ 코드를 고쳐도 exe를 다시 만들 필요 없음)
         import shutil
         python = shutil.which("pythonw") or shutil.which("python")
@@ -171,4 +182,9 @@ window.events.closing += on_closing
 # private_mode=False + storage_path: 테마 등 localStorage 설정이 다음 실행에도 남게
 webview.start(private_mode=False, storage_path=str(Path(os.environ["LOCALAPPDATA"]) / "StudyTutorApp" / "webview"))
 shutdown_server()  # 창을 닫으면 서버(와 돌던 Claude)도 같이 끈다
+for _ in range(25):  # 서버가 파일을 다 쓰고 내려간 뒤에 올린다
+    if not server_up():
+        break
+    time.sleep(0.2)
+sync_onedrive()  # 이 컴퓨터에서 바뀐 공부 기록·자료를 OneDrive에 올림
 sync_push()

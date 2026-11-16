@@ -50,13 +50,16 @@ python -m PyInstaller --noconfirm --onefile --noconsole --icon "$PWD\tools\stati
 프로젝트 폴더 맨 위에 `학습 튜터.exe`가 생겨요 (다른 곳으로 옮기지 말고 바로가기를 만드세요). exe에는 앱 창만 들어 있고 서버·도구는 설치된 Python(PATH의 `pythonw`)으로 돌아서, `tools/` 코드를 고쳐도 다시 만들 필요가 없어요. `launch.pyw`를 고쳤을 때만 다시 빌드하세요.
 
 ## 두 컴퓨터에서 이어 쓰기 (데스크탑 ↔ 노트북)
-- **공부 기록·자료**(`materials/` `texts/` `studio/` `data/` `cache/` `notes/`)는 OneDrive의 `학습 튜터 자료` 폴더에 있고, 프로젝트 폴더에는 연결(정션)만 있어요. OneDrive가 알아서 동기화해요.
+- **공부 기록·자료**(`materials/` `texts/` `studio/` `data/` `cache/` `notes/`)는 이 컴퓨터(프로젝트 폴더)에 있고, 앱은 항상 여기서 읽고 써요. 앱을 **켤 때** OneDrive의 `학습 튜터 자료`에서 다른 컴퓨터의 변경을 받고, **끌 때** 이 컴퓨터의 변경을 올려요 (`tools/onedrive_sync.py`, 터미널에서 직접 돌려도 돼요).
+  - 양쪽 다 고친 파일은 늦게 고친 쪽을 남기고, 다른 쪽은 `local/sync_backup/`에 보관해요. 다른 컴퓨터에서 지워서 여기서 지우는 파일도 거기로 옮겨요. 기록: `local/onedrive_sync.log`
+  - `cache/hd`·`cache/pages`(원본 쪽 이미지)는 다시 만들 수 있어서 동기화하지 않아요.
+  - 앱 없이 터미널(Claude Code)로 자료를 바꿨다면 다음에 앱을 켰다 끄거나 `python tools/onedrive_sync.py`를 돌려야 OneDrive에 올라가요.
 - **코드**는 GitHub으로 주고받아요. 앱을 켤 때 `git pull`(고치다 만 파일이 없을 때만), 창을 닫을 때 커밋해 둔 것만 `git push`를 자동으로 해요.
 - **컴퓨터마다 따로**: `local/`(iClass 로그인 쿠키, 창 크기·위치). iClass는 컴퓨터마다 한 번씩 로그인하세요.
-- 두 컴퓨터에서 **동시에 켜 두지 마세요.** 복습 카드 같은 파일이 서로 덮어써질 수 있어요. 한쪽을 닫고, OneDrive 동기화가 끝난 뒤(작업표시줄 구름 아이콘) 다른 쪽을 켜세요.
+- 두 컴퓨터에서 **동시에 켜 두지 마세요.** 같은 파일을 양쪽에서 고치면 한쪽은 `local/sync_backup/`으로 밀려나요. 한쪽을 닫고, OneDrive 동기화가 끝난 뒤(작업표시줄 구름 아이콘) 다른 쪽을 켜세요.
 
 두 번째 컴퓨터 처음 설정: OneDrive에 같은 계정으로 로그인해서 `학습 튜터 자료`가 내려받아지면, 그 폴더의 **`학습 튜터 설치.exe`를 더블클릭**하고 **설치**를 누르세요. (GitHub [Releases](../../releases/latest)의 `StudyTutor-Setup.exe`도 같은 파일이에요)
-Python·Git이 없으면 설치(winget)하고, 코드를 `%USERPROFILE%\study-agent`에 받고(처음엔 GitHub 로그인 창), 패키지 설치 → 자료 폴더 연결 → 바탕화면 바로가기까지 해요. 끝나면 **학습 튜터 실행** 버튼이 나와요. 다시 실행해도 안전해요.
+Python·Git이 없으면 설치(winget)하고, 코드를 `%USERPROFILE%\study-agent`에 받고(처음엔 GitHub 로그인 창), 패키지 설치 → OneDrive에서 자료 받기 → 바탕화면 바로가기까지 해요. 끝나면 **학습 튜터 실행** 버튼이 나와요. 다시 실행해도 안전해요.
 
 설치 마법사 원본은 `setup/installer.py`(창) + `setup/setup.ps1`(설치 단계)예요. 고친 뒤 다시 빌드해서 OneDrive의 `학습 튜터 자료`에 넣으세요:
 ```powershell
@@ -83,11 +86,12 @@ tools/
   engines.py           AI 엔진(Claude·GPT·Gemini) 실행·요금제별 모델 (설정: data/ai.json)
   usage.py             AI 사용량 기록·요약
   srs.py               복습 카드·간격반복(SM-2)
-  link_onedrive.ps1    두 번째 컴퓨터에서 개인 자료 폴더를 OneDrive와 연결
+  onedrive_sync.py     개인 자료 폴더 ↔ OneDrive 동기화 (앱을 켤 때·끌 때 자동)
+  link_onedrive.ps1    예전 설치 마법사용 (onedrive_sync.py를 부르기만 함)
   static/index.html    화면
 ```
 아래 폴더는 개인 자료라 저장소에 올라가지 않아요 (`.gitignore`):
-`materials/`(강의자료), `texts/`(추출본), `studio/`(정리 자료), `data/`(복습 카드·대화·퀴즈·복습 기록·시험 스타일), `cache/`, `notes/`(작업 기록) — OneDrive로 동기화
+`materials/`(강의자료), `texts/`(추출본), `studio/`(정리 자료), `data/`(복습 카드·대화·퀴즈·복습 기록·시험 스타일), `cache/`, `notes/`(작업 기록) — 앱을 켜고 끌 때 OneDrive와 동기화
 `local/`(iClass 로그인 쿠키, 창 위치) — 컴퓨터마다 따로
 
 ## 주의
