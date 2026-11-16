@@ -1111,6 +1111,8 @@ function esc(s) { const d = document.createElement("div"); d.textContent = s ?? 
 // "A · B · C" 대신 구분선으로 나눈 메타 정보
 const meta = parts => `<span class="meta">${parts.filter(Boolean).map(p => `<span>${esc(p)}</span>`).join("")}</span>`;
 
+// 답변에 그대로 둬도 되는 HTML 태그 (소문자만). <s>는 취소선보다 문장 시작 토큰으로 더 자주 나와서 뺀다
+const SAFE_TAGS = new Set("br hr sub sup b i u em strong mark small kbd code pre span div p ul ol li table thead tbody tr th td details summary blockquote a img del ins".split(" "));
 function md(text) {
   if (window.marked && window.DOMPurify) {
     // 수식($$...$$, $...$, \[...\], \(...\))은 마크다운 처리 전에 빼두었다가 KaTeX로 그려서 다시 넣는다
@@ -1125,6 +1127,8 @@ function md(text) {
       .replace(/\\\[([\s\S]+?)\\\]/g, (_, t) => keep(t, true))
       .replace(/\\\(([\s\S]+?)\\\)/g, (_, t) => keep(t, false))
       .replace(/(^|[^\\$])\$([^\s$](?:[^$\n]*?[^\s$])?)\$(?!\d)/g, (_, pre, t) => pre + keep(t, false))
+      // <X>·<Y>(센티널 토큰)·<s>·</s>·<UNK>·<exam>처럼 HTML 태그가 아닌 꺾쇠는 글자로 보이게 (안 하면 DOMPurify가 지워 버림)
+      .replace(/<(\/?)([A-Za-z][\w-]*)([^<>]*)>/g, (m, sl, tag, rest) => SAFE_TAGS.has(tag) ? m : `&lt;${sl}${tag}${rest}&gt;`)
       // 한국어: "**용어(term)**입니다"처럼 닫는 ** 뒤에 조사가 붙으면 마크다운 규칙상 굵게가 안 됨 → 직접 처리
       .replace(/\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*/g, "<strong>$1</strong>")
       // "0~9", "1~7주차"의 ~가 취소선(~text~)으로 바뀌지 않게 (의도한 취소선 ~~ 은 그대로)
@@ -2883,6 +2887,8 @@ function renderQuiz() {
   const total = qz.qs.length, answered = qz.qs.filter(q => q.verdict).length;
   $("#qzBar").style.width = total ? `${(answered / total) * 100}%` : "0";
   $("#qzLeft").textContent = total && qz.phase !== "done" ? `${qz.idx + 1} / ${total}` : "";
+  // 다 풀었으면(결과 화면·결과에서 해설 보기) 진행 바는 숨긴다
+  $("#qzProg").style.visibility = qz.phase === "done" || qz.peek ? "hidden" : "";
   actions.hidden = false;
 
   if (qz.phase === "gen" || qz.phase === "error") {
