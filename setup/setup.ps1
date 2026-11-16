@@ -5,7 +5,7 @@
 param([switch]$Wizard)
 $ErrorActionPreference = "Stop"
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8; $Host.UI.RawUI.WindowTitle = "학습 튜터 설치" } catch {}
-$env:GIT_TERMINAL_PROMPT = "0"  # 보이지 않는 창에서 git이 아이디를 묻고 멈추지 않게 (로그인은 GitHub 로그인 창으로)
+$env:GIT_TERMINAL_PROMPT = "0"  # 보이지 않는 창에서 git이 아이디를 묻고 멈추지 않게 (공개 저장소라 로그인 없이 받는다)
 $repo = "https://github.com/blueskeleton32213-lab/study-agent.git"
 $dir = Join-Path $env:USERPROFILE "study-agent"
 

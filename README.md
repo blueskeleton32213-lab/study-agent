@@ -29,8 +29,11 @@ AI 엔진은 **Claude**([Claude Code](https://claude.com/claude-code)), **GPT**(
   - Claude가 가장 잘 맞춰져 있어요. GPT·Gemini는 같은 규칙(`CLAUDE.md`)과 스킬 파일을 읽게 해 두었지만 출처 표기·형식이 조금 다를 수 있어요.
 
 ## 설치
+**설치 마법사 (추천):** [Releases](../../releases/latest)에서 `StudyTutor-Setup.exe`를 받아 더블클릭 → **설치**. Python·Git 설치부터 바탕화면 바로가기까지 알아서 해요 (자세한 건 아래 [두 컴퓨터에서 이어 쓰기](#두-컴퓨터에서-이어-쓰기-데스크탑--노트북)). 서명 없는 exe라 "Windows의 PC 보호"가 뜨면 **추가 정보 → 실행**.
+
+**직접 설치:**
 ```powershell
-git clone <이 저장소 주소> study-agent
+git clone https://github.com/blueskeleton32213-lab/study-agent.git study-agent
 cd study-agent
 python -m pip install -r requirements.txt
 ```
@@ -66,6 +69,11 @@ Python·Git이 없으면 설치(winget)하고, 코드를 `%USERPROFILE%\study-ag
 설치 마법사 원본은 `setup/installer.py`(창) + `setup/setup.ps1`(설치 단계)예요. 고친 뒤 다시 빌드해서 OneDrive의 `학습 튜터 자료`에 넣으세요:
 ```powershell
 python -m PyInstaller --noconfirm --onefile --noconsole --name "학습 튜터 설치" --icon "$PWD\tools\static\app.ico" --add-data "$PWD\setup\setup.ps1;." --add-data "$PWD\tools\static\app.ico;." --distpath "$env:OneDrive\학습 튜터 자료" --workpath "$env:TEMP\wiz-build" --specpath "$env:TEMP\wiz-build" setup\installer.py
+```
+처음 쓰는 사람이 받을 수 있게 GitHub 릴리스에도 새 버전으로 올리세요 (이름은 `StudyTutor-Setup.exe`):
+```powershell
+Copy-Item "$env:OneDrive\학습 튜터 자료\학습 튜터 설치.exe" "$env:TEMP\StudyTutor-Setup.exe"
+gh release create v1.0.N "$env:TEMP\StudyTutor-Setup.exe" --title "학습 튜터 설치 v1.0.N" --notes "바뀐 점"
 ```
 `setup.ps1`만 PowerShell로 직접 실행해도 같은 설치가 돼요.
 
