@@ -10,6 +10,8 @@
 - 다른 컴퓨터에서 지워져서 이 컴퓨터에서 지우는 파일도 local/sync_backup/ 으로 옮겨 둔다.
 - 예전 방식(폴더가 OneDrive로 가는 정션)이면 정션을 풀고 OneDrive 내용을 로컬로 복사한다 (OneDrive 쪽은 그대로).
 - cache/hd, cache/pages (원본 쪽 이미지)는 다시 만들 수 있어서 동기화하지 않는다.
+- OneDrive에 "학습 튜터 자료" 폴더가 없으면(처음 쓰는 사람) 로컬 폴더만 만들고 넘어간다.
+  그 폴더를 OneDrive에 만들어 두면 다음 동기화 때 이 컴퓨터 자료가 전부 올라간다.
 """
 from __future__ import annotations
 
@@ -216,8 +218,13 @@ def main() -> int:
         except Exception:
             pass
     if not REMOTE.is_dir():
-        log(f"OneDrive에 '학습 튜터 자료' 폴더가 없어서 동기화를 건너뜀: {REMOTE}")
-        return 2
+        # 처음 쓰는 사람·OneDrive를 안 쓰는 컴퓨터: 이 컴퓨터에만 저장하고 그대로 쓴다.
+        # 나중에 OneDrive에 '학습 튜터 자료' 폴더를 만들면 다음 동기화부터 거기로 올라간다.
+        for top in FOLDERS:
+            if not os.path.isjunction(ROOT / top):
+                (ROOT / top).mkdir(exist_ok=True)
+        log(f"OneDrive에 '학습 튜터 자료' 폴더가 없어서 이 컴퓨터에만 저장해요 (동기화 안 함): {REMOTE}")
+        return 0
     migrate(log)
     return Sync(log).run()
 

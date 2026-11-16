@@ -59,7 +59,9 @@ python -m PyInstaller --noconfirm --onefile --noconsole --icon "$PWD\tools\stati
 - 두 컴퓨터에서 **동시에 켜 두지 마세요.** 같은 파일을 양쪽에서 고치면 한쪽은 `local/sync_backup/`으로 밀려나요. 한쪽을 닫고, OneDrive 동기화가 끝난 뒤(작업표시줄 구름 아이콘) 다른 쪽을 켜세요.
 
 두 번째 컴퓨터 처음 설정: OneDrive에 같은 계정으로 로그인해서 `학습 튜터 자료`가 내려받아지면, 그 폴더의 **`학습 튜터 설치.exe`를 더블클릭**하고 **설치**를 누르세요. (GitHub [Releases](../../releases/latest)의 `StudyTutor-Setup.exe`도 같은 파일이에요)
-Python·Git이 없으면 설치(winget)하고, 코드를 `%USERPROFILE%\study-agent`에 받고(처음엔 GitHub 로그인 창), 패키지 설치 → OneDrive에서 자료 받기 → 바탕화면 바로가기까지 해요. 끝나면 **학습 튜터 실행** 버튼이 나와요. 다시 실행해도 안전해요.
+Python·Git이 없으면 설치(winget)하고, 코드를 `%USERPROFILE%\study-agent`에 받고(공개 저장소라 로그인 없음), 패키지 설치 → OneDrive에서 자료 받기 → 바탕화면 바로가기까지 해요. 끝나면 **학습 튜터 실행** 버튼이 나와요. 다시 실행해도 안전해요.
+
+**처음 쓰는 사람(OneDrive에 `학습 튜터 자료`가 없는 경우)** 도 같은 설치 마법사(GitHub Releases의 `StudyTutor-Setup.exe`)로 그대로 설치하면 돼요. 자료 폴더를 이 컴퓨터에 빈 채로 만들고, 동기화 없이 이 컴퓨터에만 저장해요. 나중에 다른 컴퓨터와 이어 쓰고 싶으면 OneDrive에 `학습 튜터 자료` 폴더를 하나 만들어 두세요. 다음에 앱을 끌 때 이 컴퓨터 자료가 전부 올라가요.
 
 설치 마법사 원본은 `setup/installer.py`(창) + `setup/setup.ps1`(설치 단계)예요. 고친 뒤 다시 빌드해서 OneDrive의 `학습 튜터 자료`에 넣으세요:
 ```powershell

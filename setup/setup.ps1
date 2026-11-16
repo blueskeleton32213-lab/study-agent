@@ -1,6 +1,6 @@
 ﻿# 새 컴퓨터에 학습 튜터 설치. 설치 마법사(학습 튜터 설치.exe, setup/installer.py)가 -Wizard 로 부른다.
 # 1) Python·Git이 없으면 winget으로 설치  2) GitHub에서 코드 받기(이미 있으면 최신으로)
-# 3) 패키지 설치  4) 개인 자료를 OneDrive에서 받아오기  5) 바탕화면 바로가기  6) 실행
+# 3) 패키지 설치  4) 개인 자료 준비 (OneDrive에 '학습 튜터 자료'가 있으면 받아오고, 없으면 새로 시작)  5) 바탕화면 바로가기  6) 실행
 # -Wizard: 멈춰서 기다리지 않고, 마지막 실행은 마법사가 한다 (LAUNCH| 줄로 알려줌)
 param([switch]$Wizard)
 $ErrorActionPreference = "Stop"
@@ -43,19 +43,19 @@ try {
     if (Test-Path (Join-Path $dir ".git")) {
         git -C $dir pull --ff-only | Out-Host
     } else {
-        Write-Host "  처음이면 GitHub 로그인 창이 떠요. 로그인해 주세요 (비공개 저장소)."
         git clone $repo $dir | Out-Host
-        if ($LASTEXITCODE) { Fail "코드를 받지 못했어요. GitHub 로그인을 확인해 주세요." }
+        if ($LASTEXITCODE) { Fail "코드를 받지 못했어요. 인터넷 연결을 확인해 주세요." }
     }
 
     Step "필요한 패키지 설치 (처음엔 1~2분)"
     python -m pip install --disable-pip-version-check -q -r (Join-Path $dir "requirements.txt") | Out-Host
     if ($LASTEXITCODE) { Fail "패키지 설치에 실패했어요." }
 
-    Step "개인 자료를 OneDrive에서 받아오기"
+    Step "개인 자료 준비 (OneDrive에 '학습 튜터 자료'가 있으면 받아오기)"
     New-Item -ItemType Directory -Force (Join-Path $dir "local") | Out-Null
     python (Join-Path $dir "tools\onedrive_sync.py") | Out-Host
-    if ($LASTEXITCODE) { Fail "OneDrive에서 자료를 받지 못했어요. OneDrive 동기화가 끝났는지 확인해 주세요." }
+    # 폴더가 없으면(처음 쓰는 사람) 로컬에만 저장하고 0으로 끝난다. 일부 파일만 실패한 건 앱을 켤 때 다시 맞추니 멈추지 않는다.
+    if ($LASTEXITCODE) { Write-Host "  일부 파일을 OneDrive에서 받지 못했어요. 앱을 켤 때 다시 받아요." -ForegroundColor Yellow }
 
     Step "바탕화면 바로가기 만들기"
     $pythonw = Join-Path (Split-Path (& python -c "import sys; print(sys.executable)")) "pythonw.exe"

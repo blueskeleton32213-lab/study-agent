@@ -45,11 +45,13 @@ class Wizard:
 
         font = ("Malgun Gothic", 10)
         tk.Label(self.root, text="학습 튜터 설치", bg=BG, fg=FG, font=("Malgun Gothic", 16, "bold")).pack(anchor="w", padx=20, pady=(18, 4))
-        ready = ONEDRIVE.exists()
-        info = ("이 컴퓨터에 학습 튜터를 설치하고, OneDrive의 공부 기록·자료와 연결해요.\n"
-                "Python·Git이 없으면 같이 설치해요. 처음엔 GitHub 로그인 창이 떠요.")
-        if not ready:
-            info += f"\n\n⚠ OneDrive에 '학습 튜터 자료' 폴더가 아직 없어요.\n   OneDrive에 로그인하고 동기화가 끝난 뒤 설치하세요."
+        info = ("이 컴퓨터에 학습 튜터를 설치해요.\n"
+                "Python·Git이 없으면 같이 설치해요.")
+        if ONEDRIVE.exists():
+            info += "\n\nOneDrive의 '학습 튜터 자료'에서 공부 기록·자료를 받아 이어서 써요."
+        else:
+            info += ("\n\n처음 쓰는 거면 그대로 설치하세요. 자료는 이 컴퓨터에 새로 만들어요.\n"
+                     "다른 컴퓨터의 기록을 이어 쓰려면 OneDrive 동기화가 끝난 뒤 설치하세요.")
         self.info = tk.Label(self.root, text=info, bg=BG, fg=SUB, font=font, justify="left")
         self.info.pack(anchor="w", padx=20)
 
@@ -75,7 +77,7 @@ class Wizard:
         self.close_btn = tk.Button(btns, text="닫기", command=self.close, bg="#2a2a31", fg=FG, relief="flat",
                                    activebackground="#34343c", activeforeground=FG, font=font, padx=16, pady=4)
         self.close_btn.pack(side="right")
-        self.main_btn = tk.Button(btns, text="설치" if ready else "다시 확인", command=self.start, bg=ACCENT, fg="white",
+        self.main_btn = tk.Button(btns, text="설치", command=self.start, bg=ACCENT, fg="white",
                                   relief="flat", activebackground="#6a7af0", activeforeground="white",
                                   font=("Malgun Gothic", 10, "bold"), padx=18, pady=4)
         self.main_btn.pack(side="right", padx=(0, 8))
@@ -93,9 +95,6 @@ class Wizard:
             subprocess.Popen([pythonw, str(Path(folder) / "tools" / "launch.pyw")], cwd=folder,
                              creationflags=NO_WINDOW, close_fds=True)
             self.root.after(500, self.root.destroy)
-            return
-        if not ONEDRIVE.exists():
-            self.write("OneDrive에 '학습 튜터 자료' 폴더가 아직 없어요. 동기화가 끝난 뒤 다시 눌러 주세요.", "err")
             return
         self.running = True
         self.step = 0
