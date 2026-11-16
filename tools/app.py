@@ -40,6 +40,7 @@ PYTHON = sys.executable.replace("pythonw.exe", "python.exe")
 # 앱이 띄우는 AI에는 튜터에 필요한 도구만 주고 개인 커넥터·스킬은 싣지 않는다 (토큰 절약).
 # 사용량은 engines.py가 data/usage.jsonl에 기록 (요약: python tools/usage.py)
 import engines  # noqa: E402
+import onedrive_sync  # noqa: E402  OneDrive 동기화 켜기/끄기 (사이드바)
 
 def code_version() -> float:
     """서버 코드(tools/*.py)의 최신 수정 시각. 실행 중에 코드가 바뀌면 launch.pyw가 서버를 교체한다."""
@@ -263,7 +264,23 @@ def app_state() -> dict:
         subjects.append({"name": name, "files": files, "cards": s.get("카드수", 0),
                          "due": s.get("오늘복습", 0), "weak": s.get("자주틀린주제", [])[:3]})
     return {"subjects": subjects, "due": sum(s["due"] for s in subjects), "syncing": is_syncing,
-            "ai": engines.current_name()}
+            "ai": engines.current_name(), "onedrive": onedrive_sync.enabled()}
+
+
+onedrive_lock = threading.Lock()
+
+
+def set_onedrive(on: bool) -> dict:
+    """사이드바 「OneDrive 동기화」 스위치. 켜면 바로 한 번 맞춘다 (다른 컴퓨터 변경 받기 + 이 컴퓨터 변경 올리기)."""
+    onedrive_sync.set_enabled(on)
+    if not on:
+        return {"ok": True, "onedrive": False, "message": "동기화를 껐어요. 이제 이 컴퓨터에만 저장해요."}
+    with onedrive_lock, srs_lock:  # 맞추는 동안 복습 카드를 쓰지 않게
+        code = onedrive_sync.main()
+    msg = onedrive_sync.last_message
+    if code:
+        msg += " (일부 파일은 다음 동기화 때 다시 시도해요)"
+    return {"ok": True, "onedrive": True, "message": msg}
 
 
 # ───────────────────────── 출처 보기 ─────────────────────────
@@ -1018,6 +1035,8 @@ class Handler(BaseHTTPRequestHandler):
                 engines.save(data)
                 data.clear()  # API 키를 메모리에 오래 두지 않는다
                 return self._json({"ok": True, "ai": engines.current_name()})
+            if url.path == "/api/onedrive":  # OneDrive 동기화 켜기/끄기
+                return self._json(set_onedrive(bool(json.loads(self._body() or b"{}").get("enabled"))))
             if url.path == "/api/ai/login":  # 로그인 창(새 콘솔) 띄우기
                 engine = json.loads(self._body()).get("engine")
                 if engine not in engines.ENGINES:

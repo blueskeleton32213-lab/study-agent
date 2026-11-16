@@ -490,6 +490,14 @@ dialog input:focus, dialog select:focus, #stDlg textarea:focus { outline: 0; bor
 /* AI 설정 */
 .nav-item .ai-name { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 96px; }
 body.side-collapsed .nav-item .ai-name { display: none; }
+/* OneDrive 동기화 스위치 */
+.nav-item .sw { margin-left: auto; flex: none; width: 28px; height: 16px; border-radius: 99px; background: var(--rule-strong); position: relative; transition: background .15s; }
+.nav-item .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .3); transition: transform .15s; }
+#syncBtn[aria-pressed="true"] .sw { background: var(--pen); }
+#syncBtn[aria-pressed="true"] .sw::after { transform: translateX(12px); }
+#syncBtn[aria-pressed="false"] svg { opacity: .5; }
+#syncBtn:disabled { cursor: progress; }
+body.side-collapsed .nav-item .sw { display: none; }
 .ai-status { margin-top: 10px; padding: 10px 12px; border-radius: 9px; background: var(--sunk); font-size: 13px; line-height: 1.55; color: var(--ink-2); }
 .ai-status .ok { color: var(--green); font-weight: 600; }
 .ai-status .no { color: var(--red); font-weight: 600; }
@@ -701,6 +709,7 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
     <button class="nav-item" data-act="studio" title="스튜디오" aria-label="스튜디오"><span data-i="studio"></span><span class="lbl">스튜디오</span></button>
     <button class="nav-item" data-act="history" title="대화 기록" aria-label="대화 기록"><span data-i="clock"></span><span class="lbl">대화 기록</span></button>
     <button class="nav-item" data-act="ai" title="AI 설정 (Claude·GPT·Gemini, 요금제)" aria-label="AI 설정"><span data-i="spark"></span><span class="lbl">AI 설정</span><span class="ai-name" id="aiName"></span></button>
+    <button class="nav-item" id="syncBtn" aria-pressed="false" title="OneDrive 동기화: 켜면 앱을 켤 때 받고 끌 때 올려요" aria-label="OneDrive 동기화"><span data-i="cloud"></span><span class="lbl">OneDrive 동기화</span><span class="sw" aria-hidden="true"></span></button>
   </nav>
   <div class="side-label"><span>과목</span><span style="display:flex;gap:2px;margin-left:auto"><button class="icon-btn" id="icBtn" title="iClass에서 새 자료 받기" aria-label="iClass에서 새 자료 받기" style="width:28px;height:28px"><span data-i="download"></span></button><button class="icon-btn" id="addSubj" title="과목 추가" style="width:28px;height:28px"><span data-i="plus"></span></button></span></div>
   <div id="subjects"></div>
@@ -982,6 +991,7 @@ const ICONS = {
   custom: '<path d="M14.5 4.5l5 5L9 20H4v-5z"/>',
   doc: '<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5V7h3"/>',
   download: '<path d="M12 4v11M7 10.5l5 5 5-5"/><path d="M5 19.5h14"/>',
+  cloud: '<path d="M7.5 18.5h9.8a3.7 3.7 0 0 0 .5-7.37A5.5 5.5 0 0 0 7.2 12a3.25 3.25 0 0 0 .3 6.5z"/>',
   spark: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
 };
 const icon = (n, s = 18) => `<svg class="i" viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true">${ICONS[n] || ""}</svg>`;
@@ -1477,6 +1487,7 @@ function renderSide() {
   for (const s of state.subjects) { const o = document.createElement("option"); o.value = s.name; o.textContent = s.name; o.selected = s.name === current; sel.append(o); }
   $("#curName").textContent = current ?? "과목 없음";
   $("#aiName").textContent = state.ai || "";
+  setSyncBtn(state.onedrive);
   $("#curMeta").textContent = cur ? (cur.weak.length ? `약한 주제: ${cur.weak.map(w => w[0]).join(", ")}` : `자료 ${cur.files.length}개`) : "왼쪽 + 버튼으로 과목을 만들어 주세요";
   document.querySelectorAll("[data-act]").forEach(b => { if (!["new", "chat", "ai"].includes(b.dataset.act)) b.disabled = busy; });
   updateNav();
@@ -1851,6 +1862,29 @@ async function iclassSync(subjects = [], shown = null) {
   $("#input").focus();
 }
 $("#icBtn").onclick = () => iclassSync([], null);
+
+/* ── OneDrive 동기화 스위치: 켜면 앱을 켤 때 받고 끌 때 올림 (컴퓨터마다 따로) ── */
+function setSyncBtn(on) {
+  const b = $("#syncBtn");
+  b.setAttribute("aria-pressed", on ? "true" : "false");
+  b.title = on ? "OneDrive 동기화 켜짐: 앱을 켤 때 받고 끌 때 올려요 (누르면 끄기)"
+               : "OneDrive 동기화 꺼짐: 이 컴퓨터에만 저장해요 (누르면 켜고 바로 한 번 맞춰요)";
+}
+$("#syncBtn").onclick = async () => {
+  const b = $("#syncBtn"), on = b.getAttribute("aria-pressed") !== "true";
+  b.disabled = true;
+  if (on) toast("OneDrive와 맞추는 중…", 1800);
+  try {
+    const r = await (await api("/api/onedrive", { method: "POST", body: JSON.stringify({ enabled: on }) })).json();
+    setSyncBtn(r.onedrive);
+    toast(r.message, 4500);
+    if (on) await loadState();
+  } catch (e) {
+    toast("동기화 설정을 바꾸지 못했어요: " + e.message, 4500);
+  } finally {
+    b.disabled = false;
+  }
+};
 for (const id of ["#icUser", "#icPw"]) $(id).addEventListener("keydown", e => {  // Enter = 로그인 (폼 기본 동작은 첫 버튼인 '취소')
   if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); if (id === "#icUser") $("#icPw").focus(); else $("#icOk").click(); }
 });

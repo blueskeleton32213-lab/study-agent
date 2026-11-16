@@ -12,6 +12,9 @@
 - cache/hd, cache/pages (원본 쪽 이미지)는 다시 만들 수 있어서 동기화하지 않는다.
 - OneDrive에 "학습 튜터 자료" 폴더가 없으면(처음 쓰는 사람) 로컬 폴더만 만들고 넘어간다.
   그 폴더를 OneDrive에 만들어 두면 다음 동기화 때 이 컴퓨터 자료가 전부 올라간다.
+- 동기화 켜기/끄기는 컴퓨터마다 따로 (local/sync_settings.json, 앱 사이드바의 「OneDrive 동기화」).
+  꺼져 있으면 아무것도 주고받지 않는다. 아직 고른 적이 없으면 OneDrive 폴더가 있을 때 켜진 것으로 본다.
+    python tools/onedrive_sync.py on | off | status
 """
 from __future__ import annotations
 
@@ -29,10 +32,25 @@ SKIP_DIRS = {"cache/hd", "cache/pages"}
 STATE = ROOT / "local" / "onedrive_sync.json"
 BACKUP = ROOT / "local" / "sync_backup"
 LOG = ROOT / "local" / "onedrive_sync.log"
+SETTINGS = ROOT / "local" / "sync_settings.json"
 DIR = (-1, 0)  # 폴더는 '있다/없다'만 본다
 TMP_PREFIX = ".~sync-"
 
 Stat = tuple[int, int]  # (크기, 수정 시각 초)
+last_message = ""  # 마지막 로그 한 줄 (앱이 결과를 보여 줄 때 쓴다)
+
+
+def enabled() -> bool:
+    """이 컴퓨터에서 OneDrive 동기화를 켰는지. 고른 적이 없으면 OneDrive 폴더가 있을 때 켜짐."""
+    try:
+        return bool(json.loads(SETTINGS.read_text(encoding="utf-8"))["enabled"])
+    except Exception:
+        return REMOTE.is_dir()
+
+
+def set_enabled(on: bool) -> None:
+    SETTINGS.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS.write_text(json.dumps({"enabled": bool(on)}), encoding="utf-8")
 
 
 def skip_file(name: str) -> bool:
@@ -203,6 +221,8 @@ def main() -> int:
     out = sys.stdout
 
     def log(msg: str) -> None:
+        global last_message
+        last_message = msg
         line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}"
         if out:
             try:
@@ -225,9 +245,25 @@ def main() -> int:
                 (ROOT / top).mkdir(exist_ok=True)
         log(f"OneDrive에 '학습 튜터 자료' 폴더가 없어서 이 컴퓨터에만 저장해요 (동기화 안 함): {REMOTE}")
         return 0
-    migrate(log)
+    migrate(log)  # 켜짐·꺼짐과 상관없이: 정션이면 앱이 OneDrive에 바로 쓰게 되므로 로컬 폴더로 바꾼다
+    if not enabled():
+        log("OneDrive 동기화가 꺼져 있어서 이 컴퓨터에만 저장해요 (앱 사이드바 「OneDrive 동기화」로 켜기)")
+        return 0
     return Sync(log).run()
 
 
 if __name__ == "__main__":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd in ("on", "off"):
+        set_enabled(cmd == "on")
+        print(f"OneDrive 동기화를 {'켰어요' if cmd == 'on' else '껐어요'}")
+        if cmd == "off":
+            sys.exit(0)
+    elif cmd == "status":
+        print(f"OneDrive 동기화: {'켜짐' if enabled() else '꺼짐'} ({REMOTE}{'' if REMOTE.is_dir() else ' 없음'})")
+        sys.exit(0)
     sys.exit(main())

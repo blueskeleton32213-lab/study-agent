@@ -54,6 +54,7 @@ python -m PyInstaller --noconfirm --onefile --noconsole --icon "$PWD\tools\stati
 
 ## 두 컴퓨터에서 이어 쓰기 (데스크탑 ↔ 노트북)
 - **공부 기록·자료**(`materials/` `texts/` `studio/` `data/` `cache/` `notes/`)는 이 컴퓨터(프로젝트 폴더)에 있고, 앱은 항상 여기서 읽고 써요. 앱을 **켤 때** OneDrive의 `학습 튜터 자료`에서 다른 컴퓨터의 변경을 받고, **끌 때** 이 컴퓨터의 변경을 올려요 (`tools/onedrive_sync.py`, 터미널에서 직접 돌려도 돼요).
+  - 사이드바 **OneDrive 동기화** 스위치로 컴퓨터마다 켜고 꺼요 (`local/sync_settings.json`). 꺼 두면 아무것도 주고받지 않고 이 컴퓨터에만 저장해요. 켜면 그 자리에서 한 번 맞춰요. 처음엔 OneDrive에 `학습 튜터 자료`가 있으면 켜진 상태예요. 터미널: `python tools/onedrive_sync.py on` / `off` / `status`
   - 양쪽 다 고친 파일은 늦게 고친 쪽을 남기고, 다른 쪽은 `local/sync_backup/`에 보관해요. 다른 컴퓨터에서 지워서 여기서 지우는 파일도 거기로 옮겨요. 기록: `local/onedrive_sync.log`
   - `cache/hd`·`cache/pages`(원본 쪽 이미지)는 다시 만들 수 있어서 동기화하지 않아요.
   - 앱 없이 터미널(Claude Code)로 자료를 바꿨다면 다음에 앱을 켰다 끄거나 `python tools/onedrive_sync.py`를 돌려야 OneDrive에 올라가요.
