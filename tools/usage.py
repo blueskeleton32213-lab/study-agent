@@ -15,7 +15,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 LOG = ROOT / "data" / "usage.jsonl"
 KIND_NAMES = {"chat": "질문하기", "ask": "질문 창", "quiz": "퀴즈 출제", "style": "시험 스타일 분석",
-              "studio": "스튜디오", "grade": "서술형 채점", "digest": "요약본 만들기"}
+              "studio": "스튜디오", "grade": "서술형 채점", "digest": "요약본 만들기",
+              "websolve": "인터넷 답 찾기"}
 
 
 def log(kind: str, ev: dict, engine: str = "claude") -> None:

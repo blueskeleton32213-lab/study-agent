@@ -57,6 +57,31 @@ procs: dict[str, subprocess.Popen] = {}
 def is_busy(slot: str | None = None) -> bool:
     with state_lock:
         return any(p.poll() is None for k, p in procs.items() if slot in (None, k))
+
+
+# 인터넷이 끊기면 AI CLI가 재시도만 하며 답이 없어 화면이 무한 로딩된다 → AI를 부르기 전에 먼저 확인
+OFFLINE_MSG = "인터넷에 연결되어 있지 않아요. 인터넷을 연결해서 사용해주세요."
+AI_HOSTS = {"claude": "api.anthropic.com", "gpt": "chatgpt.com", "gemini": "generativelanguage.googleapis.com"}
+AI_PATHS = {"/api/chat", "/api/quiz/generate", "/api/studio/generate", "/api/quiz/grade", "/api/quiz/websolve"}
+_net = {"ok": True, "at": 0.0}
+
+
+def online() -> bool:
+    """AI 서버(없으면 1.1.1.1)에 3초 안에 붙으면 인터넷 있음. 결과는 연결되면 30초, 끊기면 바로 다시 확인"""
+    import socket
+    if _net["ok"] and time.time() - _net["at"] < 30:
+        return True
+    host = AI_HOSTS.get(engines.load().get("engine"), "api.anthropic.com")
+    ok = False
+    for addr in (host, "1.1.1.1"):
+        try:
+            socket.create_connection((addr, 443), timeout=3).close()
+            ok = True
+            break
+        except OSError:
+            pass
+    _net.update(ok=ok, at=time.time())
+    return ok
 last_seen = time.time()
 
 
@@ -76,18 +101,20 @@ def run_tool(*args: str) -> str:
 
 # ───────────────────────── 대화 기록 ─────────────────────────
 CHATS = ROOT / "data" / "chats"
+ASKS = ROOT / "data" / "asks"  # 질문 창(드래그해서 묻기) 대화는 따로 모은다. 같은 모양 + 사용자 메시지에 quote(드래그한 부분)
+TALKS = {"chats": CHATS, "asks": ASKS}  # /api/chats/*, /api/asks/* 가 같은 코드를 쓴다
 CHAT_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
-def chat_path(cid: str) -> Path:
+def chat_path(cid: str, base: Path = CHATS) -> Path:
     if not CHAT_ID.match(cid or ""):
         raise ValueError("잘못된 대화 기록이에요")
-    return CHATS / f"{cid}.json"
+    return base / f"{cid}.json"
 
 
-def chat_list() -> list[dict]:
+def chat_list(base: Path = CHATS) -> list[dict]:
     out = []
-    for f in CHATS.glob("*.json") if CHATS.exists() else []:
+    for f in base.glob("*.json") if base.exists() else []:
         try:
             c = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -95,24 +122,37 @@ def chat_list() -> list[dict]:
         # 검색용으로 대화 내용을 짧게 합쳐서 같이 보낸다 (전체 내용은 열 때 받음)
         text = " ".join(m.get("text", "") for m in c.get("messages", []))
         out.append({"id": c["id"], "title": c.get("title", ""), "subject": c.get("subject"), "created": c.get("created"),
-                    "updated": c.get("updated"), "count": len(c.get("messages", [])), "search": text[:4000]})
+                    "updated": c.get("updated"), "count": len(c.get("messages", [])), "search": text[:4000],
+                    "scope": (c.get("scope") or {}).get("label")})
     return sorted(out, key=lambda c: c.get("updated") or "", reverse=True)
 
 
-def chat_save(data: dict) -> dict:
+def chat_save(data: dict, base: Path = CHATS) -> dict:
     import uuid
-    msgs = [{"role": m["role"], "text": str(m.get("text", ""))} for m in data.get("messages", [])
-            if m.get("role") in ("user", "bot", "notice")]
+
+    def keep(m):
+        r = {"role": m["role"], "text": str(m.get("text", ""))}
+        q = m.get("quote")
+        if isinstance(q, dict) and q.get("text"):  # 질문 창: 어디서 어떤 부분을 드래그해서 물었는지
+            r["quote"] = {"where": str(q.get("where", ""))[:40], "text": str(q["text"])[:1500]}
+        return r
+    msgs = [keep(m) for m in data.get("messages", []) if m.get("role") in ("user", "bot", "notice")]
     if not msgs:
         raise ValueError("저장할 대화가 없어요")
     cid = data.get("id") or uuid.uuid4().hex
-    path = chat_path(cid)
+    path = chat_path(cid, base)
     now = time.strftime("%Y-%m-%d %H:%M:%S")
     old = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    first = next((m["text"] for m in msgs if m["role"] == "user"), "새 대화")
+    fm = next((m for m in msgs if m["role"] == "user"), {"text": "새 대화"})
+    first = fm["text"]
+    if fm.get("quote"):  # 질문 창은 "쉽게 설명해줘"만으로는 구분이 안 돼서 드래그한 부분을 제목 앞에
+        q = re.sub(r"\s+", " ", fm["quote"]["text"]).strip()[:24]
+        first = f"「{q}」 {first}"
     title = old.get("title") or re.sub(r"\s+", " ", first).strip()[:48]
-    CHATS.mkdir(parents=True, exist_ok=True)
-    rec = {"id": cid, "title": title, "subject": data.get("subject") or old.get("subject"),
+    base.mkdir(parents=True, exist_ok=True)
+    sc = data.get("scope") or old.get("scope")  # 질문 창: 이 대화의 범위 (이 퀴즈·이 정리 자료 …)
+    sc = {"key": str(sc.get("key", ""))[:300], "label": str(sc.get("label", ""))[:120]} if isinstance(sc, dict) else None
+    rec = {"id": cid, "title": title, "subject": data.get("subject") or old.get("subject"), **({"scope": sc} if sc else {}),
            "session_id": data.get("session_id") or old.get("session_id"),
            "created": old.get("created", now), "updated": now, "messages": msgs}
     tmp = path.with_suffix(".tmp")
@@ -370,6 +410,10 @@ def render_page(rel: str, page: int) -> bytes:
 
 # ───────────────────────── Claude 호출 ─────────────────────────
 def tool_label(name: str, inp: dict) -> str:
+    if name == "WebSearch":
+        return f"🌐 인터넷 검색: {inp.get('query', '')}"[:80]
+    if name == "WebFetch":
+        return f"🌐 웹 페이지 읽는 중: {urlparse(inp.get('url', '')).netloc}"[:80]
     if name in ("Grep", "Glob"):
         return f"자료 검색: {inp.get('pattern', '')}"[:80]
     if name == "Read":
@@ -420,10 +464,11 @@ def tool_label(name: str, inp: dict) -> str:
 
 
 def stream_claude(message: str, session_id: str | None, send, schema: dict | None = None,
-                  on_result=None, slot: str = "chat", kind: str | None = None) -> None:
+                  on_result=None, slot: str = "chat", kind: str | None = None, web: bool = False) -> None:
     """설정에서 고른 AI 엔진을 실행하며 이벤트를 send로 흘려보낸다. on_result가 있으면 result 이벤트를 넘겨준다.
-    schema: 답을 이 JSON 모양으로 받는다 (result의 structured_output). kind: 모델 선택·사용량 기록용 이름 (없으면 slot)"""
-    run = engines.start(kind or slot, message, session_id, schema)
+    schema: 답을 이 JSON 모양으로 받는다 (result의 structured_output). kind: 모델 선택·사용량 기록용 이름 (없으면 slot)
+    web: 이번 실행에만 인터넷 검색을 켠다 (퀴즈의 '인터넷에서 답 찾기' — 사용자가 개수를 고른 뒤에만)"""
+    run = engines.start(kind or slot, message, session_id, schema, web=web)
     proc = run.proc
     with state_lock:
         procs[slot] = proc
@@ -462,8 +507,10 @@ QUIZ_SCHEMA = {
             "explanation": {"type": "string"},
             "source": {"type": "string"},
             "topic": {"type": "string"},
+            # 답의 근거: 해설(해설·정답 파일) / 자료(강의자료에서 찾아 직접 풂) / 근거 없음(자료에서 못 찾음 → 앱이 인터넷으로 찾을지 묻는다)
+            "basis": {"type": "string", "enum": ["해설", "자료", "근거 없음"]},
         },
-        "required": ["type", "question", "choices", "answer_index", "answer", "explanation", "source", "topic"],
+        "required": ["type", "question", "choices", "answer_index", "answer", "explanation", "source", "topic", "basis"],
     }}},
     "required": ["questions"],
 }
@@ -485,17 +532,27 @@ QTYPES = {"mix": "객관식과 서술형을 반반 정도 섞어서", "mcq": "�
 
 
 # ───────────────────────── 과목별 시험 스타일 ─────────────────────────
-# 파일명으로 시험 관련 자료를 찾는다 (중간고사·기출·모의고사·퀴즈·문제지·해설·형광펜 문항 등)
-EXAM_RE = re.compile(r"중간|기말|기출|모의|퀴즈|quiz|문제지|해설|solution|답안|시험|exam|형광펜", re.I)
+# 파일명으로 시험·문제 자료를 찾는다 (중간고사·기출·모의고사·퀴즈·문제지·해설·형광펜 문항·연습문제·Question 등)
+# 강의 파일 속에 섞인 예제·연습문제는 파일명으로 못 찾으니, 분석할 때 AI가 본문을 검색해서 찾는다 (style_prompt)
+EXAM_RE = re.compile(r"중간|기말|기출|모의|퀴즈|quiz|문제|해설|solution|답안|정답|시험|exam|형광펜|question|exercise|연습", re.I)
 STYLES = ROOT / "data" / "styles"
-STYLE_SCHEMA = {"type": "object", "properties": {"guide": {"type": "string"}}, "required": ["guide"]}
+# pool: 문제 지도 — 따로 준 문제·강의 속 예제/연습문제·시험에 뽑힌 문제의 위치와 답이 있는지 (문제 본문은 안 옮김)
+POOL_ITEM = {"type": "object", "properties": {
+    "source": {"type": "string"}, "page": {"type": "string"}, "label": {"type": "string"},
+    "kind": {"type": "string", "enum": ["시험지", "연습문제", "예제"]}, "picked": {"type": "boolean"},
+    "why": {"type": "string"}, "topic": {"type": "string"}, "answer": {"type": "string"}},
+    "required": ["source", "page", "label", "kind", "picked", "why", "topic", "answer"]}
+STYLE_SCHEMA = {"type": "object", "properties": {"guide": {"type": "string"}, "pool": {"type": "array", "items": POOL_ITEM}},
+                "required": ["guide", "pool"]}
 
 
 def exam_files(subject: str) -> list[Path]:
     folder = MATERIALS / subject
     if not folder.exists():
         return []
-    return sorted(f for f in folder.rglob("*") if f.suffix.lower() in ALLOWED_EXT and EXAM_RE.search(f.stem))
+    import unicodedata  # iClass·Mac에서 온 파일 이름은 한글이 풀어쓴 형태(NFD)라 "퀴즈"·"문제"가 안 맞는다 → NFC로 맞춰서 찾는다
+    return sorted(f for f in folder.rglob("*")
+                  if f.suffix.lower() in ALLOWED_EXT and EXAM_RE.search(unicodedata.normalize("NFC", f.stem)))
 
 
 def style_info(subject: str) -> dict:
@@ -512,34 +569,64 @@ def style_info(subject: str) -> dict:
     note = note_path.read_text(encoding="utf-8").strip() if note_path.exists() else ""
     return {"subject": subject, "files": [f.name for f in files], "has_exam": bool(files), "note": note,
             "analyzed": rec.get("created") if rec else None, "guide": rec.get("guide") if rec else None,
+            "pool": (rec.get("pool") or []) if rec else [],
             # 시험 자료가 추가·수정·삭제되면 다시 분석해야 한다
             "stale": bool(files) and (not rec or rec.get("files") != sig), "sig": sig}
 
 
-def style_prompt(subject: str, files: list[str]) -> str:
-    names = "\n".join(f"- {n} → texts/{subject}/{Path(n).with_suffix('.md').name}" for n in files)
-    return f"""[시험 스타일 분석 — 결과는 JSON(guide)으로만]
+def style_prompt(subject: str, files: list[str], note: str = "") -> str:
+    names = "\n".join(f"- {n} → texts/{subject}/{Path(n).with_suffix('.md').name}" for n in files) or "- (파일명으로 찾은 시험·문제 파일 없음)"
+    return f"""[시험 스타일 분석 — 결과는 JSON(guide, pool)으로만]
 과목: {subject}
-아래 시험 관련 자료를 **모두** 읽고, 이 과목 시험이 어떤 형식으로 나오는지 출제자가 그대로 따라 할 수 있는 스타일 가이드를 만든다.
+이 과목 교수님은 문제를 세 가지 방식으로 낼 수 있다: ① 문제를 파일로 따로 준다 ② 개념 설명 사이에 예제·연습문제를 넣는다 ③ 연습문제 중 몇 개만 골라 시험에 낸다.
+셋을 모두 찾아 "문제 지도"(pool)를 만들고, 이 과목 시험이 어떤 형식으로 나오는지 출제자가 그대로 따라 할 수 있는 스타일 가이드(guide)를 만든다.
+
+## 입력
+- 시험·문제 파일 (파일명으로 찾음, **모두** 읽는다):
 {names}
+- 강의 파일 목록: cache/목차/{subject}.md
+- 교수님 출제 메모 (학생이 적은 것, 가장 우선): {note or "없음"}
 
-guide(마크다운, 1500~3000자)에 담을 것:
-1. 문항 구성: 한 시험(또는 한 세트)의 문항 수, 유형 비율(계산·서술·단답·객관식·OX·빈칸), 배점 표시 방식
-2. 문장 형식: 실제 문제의 말투와 지시문 템플릿 3~6개 (원문 표현을 짧게 인용, 예: "~를 구하시오", "(10점)")
-3. 구조: 소문항 (1)(2)/(a)(b) 사용 여부, 조건·표·그림·수식을 주는 방식
-4. 자주 나오는 주제와 강의 범위 (어느 강의·주차에서 많이 나오는지)
-5. 난이도와 함정: 자주 유도하는 실수, 헷갈리게 만드는 포인트
-6. 답안 요구 형식: 풀이 과정 요구 여부, 단위·최종 답 표기
-7. 출제 체크리스트: 이 과목 스타일로 새 문제를 낼 때 지킬 것 5~8개
+## 1단계: 문제 찾기 (토큰 절약 — 강의 원문을 통째로 읽지 않는다)
+A. 따로 준 문제: 위 시험·문제 파일을 읽는다. 해설·정답·solution 파일이 있으면 어느 문제의 답인지 짝짓는다.
+B. 강의 속 문제: texts/{subject}/ 전체를 Grep으로 찾는다 (패턴 예: `예제|Example|Exercise|연습\\s*문제|Problem|확인\\s*문제|풀어\\s*보|Quiz|Q\\d`).
+   찾은 쪽만 앞뒤 20~40줄 읽어 학생이 직접 풀어야 하는 문제인지 확인한다. 개념 설명 속 짧은 예시는 뺀다. 풀이가 같은 쪽·다음 쪽에 있으면 답이 있는 것.
+C. 시험에 뽑힌 문제 (picked):
+   - 메모에 "Ch3 연습문제 2·5번" 같은 지정이 있으면 그대로 표시한다.
+   - 형광펜·시험대비·범위 공지 파일에 문항 번호가 있으면 표시한다.
+   - 기출·모의고사 문제가 어떤 연습문제·예제와 같은 구조면(숫자만 다르거나 그대로) 그 연습문제를 표시하고 why에 짝을 적는다.
+   - 근거가 없으면 picked는 false. 추측하지 않는다.
 
-규칙: 수식은 LaTeX. `(🖼 ...)` 표시가 있는 쪽의 수식·그림이 필요하면 render.py로 원본을 본다. 문제를 통째로 옮기지 말고 형식을 요약한다. 인사말·진행 멘트 없이."""
+## 2단계: guide (마크다운, 1500~3000자)
+1. 출제 방식: 위 ①②③ 중 이 과목은 어떤 방식인지와 비율 (예: "시험 6문제 중 4문제가 연습문제 변형")
+2. 문항 구성: 한 시험(또는 한 세트)의 문항 수, 유형 비율(계산·서술·단답·객관식·OX·빈칸), 배점 표시 방식
+3. 문장 형식: 실제 문제의 말투와 지시문 템플릿 3~6개 (원문 표현을 짧게 인용, 예: "~를 구하시오", "(10점)")
+4. 구조: 소문항 (1)(2)/(a)(b) 사용 여부, 조건·표·그림·수식을 주는 방식
+5. 연습문제 → 시험 변형 방식: 숫자만 바꿈 / 조건 추가 / 소문항 합침 / 그대로 (짧은 예 1~2개)
+6. 자주 나오는 주제와 강의 범위, 난이도와 함정
+7. 답안 요구 형식: 풀이 과정 요구 여부, 단위·최종 답 표기
+8. 출제 체크리스트: 이 과목 스타일로 새 문제를 낼 때 지킬 것 5~8개
+
+## pool (최대 60개, 시험에 뽑힌 것·시험지 문제 먼저)
+source: 원본 파일명 그대로 / page: "p.N"·"slide N" / label: "예제 3.2", "연습문제 5", "중간 3번" / kind: 시험지·연습문제·예제
+picked·why: 위 C / topic: 짧은 개념명 / answer: 답이 있으면 "해설 있음: 파일명 p.N", 없으면 "없음"
+
+규칙: 수식은 LaTeX. `(🖼 ...)` 표시가 있는 쪽의 수식·그림이 필요하면 render.py로 원본을 본다. 문제를 통째로 옮기지 말고 형식을 요약한다 (pool에는 위치만). 인사말·진행 멘트 없이."""
 
 
-def save_style(subject: str, guide: str, sig: dict) -> None:
+def save_style(subject: str, guide: str, sig: dict, pool: list | None = None) -> None:
     STYLES.mkdir(parents=True, exist_ok=True)
     (STYLES / f"{subject}.json").write_text(json.dumps(
-        {"subject": subject, "created": time.strftime("%Y-%m-%d %H:%M"), "files": sig, "guide": guide},
+        {"subject": subject, "created": time.strftime("%Y-%m-%d %H:%M"), "files": sig, "guide": guide, "pool": pool or []},
         ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def pool_text(pool: list) -> str:
+    """퀴즈 출제에 넘길 문제 지도 (한 줄씩, 시험에 뽑힌 것 먼저)"""
+    rows = sorted(pool or [], key=lambda p: not p.get("picked"))[:60]
+    return "\n".join(f"- {'★ ' if p.get('picked') else ''}{p.get('label', '')} | {p.get('source', '')} {p.get('page', '')} | "
+                     f"{p.get('kind', '')} | {p.get('topic', '')} | 답: {p.get('answer', '')}"
+                     + (f" | {p.get('why')}" if p.get("picked") and p.get("why") else "") for p in rows)
 
 
 def save_note(subject: str, note: str) -> None:
@@ -553,8 +640,15 @@ def save_note(subject: str, note: str) -> None:
 
 
 def quiz_prompt(subject: str, scope: str, n: int, level: str, qtype: str, guide: str | None = None,
-                note: str = "") -> str:
+                note: str = "", pool: list | None = None) -> str:
     style_block = ""
+    if pool:
+        style_block += f"""
+
+## 문제 지도 (★ = 시험에 뽑힌 문제. 형식: 이름 | 위치 | 종류 | 주제 | 답 유무)
+{pool_text(pool)}
+- 범위 안에 ★ 문제가 있으면 그 문제들을 **먼저** 출제한다. 원문 그대로가 아니라 숫자·조건을 바꾼 변형으로 내고, 문제 끝에 "(연습문제 5 변형)"처럼 원래 문제를 밝힌다. 원래 문제는 위치를 보고 그 쪽만 읽는다.
+- 남은 문제 수는 아래 스타일대로 강의자료에서 새로 낸다."""
     if guide or note:
         qtype_text = "이 과목 시험 스타일의 유형 비율대로" if qtype == "mix" else QTYPES.get(qtype, QTYPES["mix"])
         parts = []
@@ -562,7 +656,7 @@ def quiz_prompt(subject: str, scope: str, n: int, level: str, qtype: str, guide:
             parts.append(f"## 교수님 출제 스타일 (학생이 직접 적은 것 — 가장 우선한다)\n{note}")
         if guide:
             parts.append(f"## 시험 자료에서 분석한 스타일{' (위 메모와 다르면 메모를 따른다)' if note else ''}\n{guide}")
-        style_block = "\n\n" + "\n\n".join(parts) + f"""
+        style_block += "\n\n" + "\n\n".join(parts) + f"""
 
 시험 스타일 출제 규칙 (반드시 따른다):
 - 위 스타일의 유형 비율, 말투, 지시문, 소문항 구조, 배점 표시를 그대로 따라 **실제 시험지처럼** 만든다. 배점을 표시하는 과목이면 문제 앞에 "(10점)"처럼 붙인다.
@@ -583,7 +677,40 @@ def quiz_prompt(subject: str, scope: str, n: int, level: str, qtype: str, guide:
 7. explanation: 왜 그게 정답인지 2~4문장. 흔한 실수가 있으면 함께.
 8. source: 원본 파일명 + 위치, 예) `Lecture05_TFIDF_Part1.pdf p.12`, `보고서.docx part 4`, `2강.pptx slide 3`.
 9. topic: 짧고 일관된 개념명 (예: "TF-IDF-정의").
-10. 복습 카드 저장, 확인 질문, 인사말은 하지 않는다. 문제는 정확히 {n}개."""
+10. basis — 답의 근거 (인터넷은 쓰지 않는다):
+    - "해설": 해설·정답·solution 파일이나 강의의 풀이에 답이 있어 그것을 따랐다. 내가 푼 답과 다르면 해설을 따르고 차이를 explanation에 한 줄로 적는다.
+    - "자료": 답은 없지만 강의자료의 정의·공식·비슷한 예제로 직접 풀었다. explanation에 근거가 된 쪽을 출처로 단다.
+    - "근거 없음": 강의자료에서 풀이 근거를 찾지 못했다. 그래도 가장 그럴듯한 답을 쓰되 explanation 앞에 "⚠ 강의자료에서 근거를 찾지 못했어요."를 붙인다. (학생이 고르면 앱이 인터넷에서 다시 찾는다)
+11. 복습 카드 저장, 확인 질문, 인사말은 하지 않는다. 문제는 정확히 {n}개."""
+
+
+# 강의자료에서 근거를 못 찾은 문제(basis "근거 없음")를 학생이 고른 개수만큼 인터넷에서 다시 풀기
+WEBSOLVE_SCHEMA = {"type": "object", "properties": {"items": {"type": "array", "items": {"type": "object", "properties": {
+    "i": {"type": "integer"}, "answer": {"type": "string"}, "answer_index": {"type": "integer"},
+    "explanation": {"type": "string"}, "basis": {"type": "string", "enum": ["자료", "인터넷"]},
+    "sources": {"type": "array", "items": {"type": "string"}}, "confident": {"type": "boolean"}},
+    "required": ["i", "answer", "answer_index", "explanation", "basis", "sources", "confident"]}}}, "required": ["items"]}
+
+
+def websolve_prompt(subject: str, items: list[tuple[int, dict]]) -> str:
+    blocks = []
+    for i, q in items:
+        ch = "\n".join(f"  {k}. {c}" for k, c in zip("ABCD", q.get("choices") or []))
+        blocks.append(f"### 문제 {i}\n{q.get('question', '')}\n" + (f"보기:\n{ch}\n" if ch else "")
+                      + f"(출제 때 쓴 답: {q.get('answer', '')} / 출처: {q.get('source', '')})")
+    body = "\n\n".join(blocks)
+    return f"""[인터넷으로 답 찾기 — 결과는 JSON(items)으로만]
+과목: {subject}
+아래 문제들은 퀴즈를 만들 때 강의자료에서 답의 근거를 찾지 못한 것이다. 학생이 인터넷으로 찾아보라고 골랐다.
+문제마다:
+1. 먼저 texts/{subject}/에서 Grep으로 한 번 더 찾는다 (핵심 용어를 한국어·영어로). 근거가 있으면 basis "자료", explanation에 쪽 출처를 단다.
+2. 없으면 WebSearch로 찾는다 (필요하면 WebFetch로 그 페이지만). 대학 강의노트·교재·표준 문서처럼 믿을 만한 곳을 쓴다. 문제마다 검색은 2번 안팎.
+   basis "인터넷", sources에 실제로 참고한 URL, explanation 끝에 "🌐 인터넷 참고 — 강의자료에는 없는 내용: 사이트 이름" 한 줄.
+3. 객관식은 answer_index(0~3)와 answer(정답 보기의 내용), 서술형은 answer_index -1과 채점 기준이 되는 모범답안.
+4. 찾아도 확신이 낮으면 confident false로 하고 explanation 앞에 "⚠ 검토 필요:"와 이유를 쓴다.
+5. i는 아래 문제 번호 그대로. 수식은 LaTeX. 인사말 없이.
+
+{body}"""
 
 
 def clean_questions(raw: list[dict]) -> list[dict]:
@@ -943,11 +1070,18 @@ class Handler(BaseHTTPRequestHandler):
                 for e in engines.ENGINES:
                     engines.list_models(e, refresh=True)
             self._json(engines.summary())
-        elif path == "/api/chats":
-            self._json({"chats": chat_list()})
-        elif path == "/api/chats/get":
+        elif path in ("/api/chats", "/api/asks"):
+            self._json({"chats": chat_list(TALKS[path.split("/")[2]])})
+        elif path == "/api/weak/check":  # 약점 분석에 쓸 기록이 있는지 (복습 카드·질문하기·질문 창)
+            import studylog
+            subj = parse_qs(urlparse(self.path).query).get("subject", [""])[0]
+            self._json(studylog.counts(subj))
+        elif path == "/api/weak/log":  # /weak 요청에 붙여 보낼 공부 기록 (앱의 Claude가 스크립트를 따로 돌리지 않게)
+            import studylog
+            self._json({"log": studylog.render(parse_qs(urlparse(self.path).query).get("subject", [""])[0])})
+        elif path in ("/api/chats/get", "/api/asks/get"):
             try:
-                p = chat_path(parse_qs(urlparse(self.path).query).get("id", [""])[0])
+                p = chat_path(parse_qs(urlparse(self.path).query).get("id", [""])[0], TALKS[path.split("/")[2]])
                 self._json(json.loads(p.read_text(encoding="utf-8")))
             except (ValueError, OSError) as exc:
                 self._json({"error": f"대화 기록을 열지 못했어요: {exc}"}, 404)
@@ -1013,6 +1147,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "forbidden"}, 403)
         last_seen = time.time()
         url = urlparse(self.path)
+        if url.path in AI_PATHS and not online():
+            self._body()  # 보낸 내용은 읽고 버린다 (안 읽으면 연결이 끊긴 것처럼 보일 수 있음)
+            return self._json({"error": OFFLINE_MSG, "offline": True}, 503)
         try:
             if url.path == "/api/chat":
                 return self._chat()
@@ -1054,6 +1191,8 @@ class Handler(BaseHTTPRequestHandler):
                 with srs_lock:
                     card = srs.grade(int(data["id"]), srs.BUTTONS[data["button"]])
                 return self._json({"ok": True, "due": card["due"], "interval": card["interval"]})
+            if url.path == "/api/quiz/websolve":  # 근거 없는 문제를 학생이 고른 개수만큼 인터넷으로
+                return self._quiz_websolve()
             if url.path == "/api/quiz/generate":
                 return self._quiz_generate()
             if url.path == "/api/studio/generate":
@@ -1090,17 +1229,18 @@ class Handler(BaseHTTPRequestHandler):
                 if p.exists():
                     p.unlink()
                 return self._json({"ok": True})
-            if url.path == "/api/chats/save":
-                return self._json(chat_save(json.loads(self._body())))
-            if url.path == "/api/chats/rename":
+            talk = url.path.split("/")[2] if url.path.startswith(("/api/chats/", "/api/asks/")) else None
+            if talk and url.path.endswith("/save"):
+                return self._json(chat_save(json.loads(self._body()), TALKS[talk]))
+            if talk and url.path.endswith("/rename"):
                 data = json.loads(self._body())
-                p = chat_path(data["id"])
+                p = chat_path(data["id"], TALKS[talk])
                 rec = json.loads(p.read_text(encoding="utf-8"))
                 rec["title"] = re.sub(r"\s+", " ", str(data["title"])).strip()[:80] or rec["title"]
                 p.write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
                 return self._json({"ok": True, "title": rec["title"]})
-            if url.path == "/api/chats/delete":
-                recycle([chat_path(json.loads(self._body())["id"])])
+            if talk and url.path.endswith("/delete"):
+                recycle([chat_path(json.loads(self._body())["id"], TALKS[talk])])
                 return self._json({"ok": True})
             if url.path == "/api/quizzes/save":
                 return self._json(quiz_save(json.loads(self._body())))
@@ -1242,24 +1382,27 @@ class Handler(BaseHTTPRequestHandler):
             if ev["type"] not in ("text", "done", "session"):
                 send(ev)
         try:
-            guide, note = None, ""
+            guide, note, pool = None, "", []
             if data.get("style", "exam") == "exam":
                 info = style_info(subject)
                 note = info["note"]
                 guide = info["guide"] if info["has_exam"] else None  # 시험 자료를 지웠으면 예전 분석은 쓰지 않는다
+                pool = info["pool"] if info["has_exam"] else []
                 if info["has_exam"] and (info["stale"] or not guide):
-                    # 처음이거나 시험 자료가 바뀌었으면 스타일부터 분석해서 저장
-                    send({"type": "tool", "label": f"시험 스타일 분석 중 (자료 {len(info['files'])}개, 처음 한 번)"})
+                    # 처음이거나 시험 자료가 바뀌었으면 스타일부터 분석해서 저장 (강의 속 예제·연습문제도 찾아 문제 지도로)
+                    send({"type": "tool", "label": f"시험 스타일·문제 지도 분석 중 (시험·문제 파일 {len(info['files'])}개 + 강의 속 예제, 처음 한 번)"})
                     sres = {}
-                    stream_claude(style_prompt(subject, info["files"]), None, forward,
+                    stream_claude(style_prompt(subject, info["files"], note), None, forward,
                                   STYLE_SCHEMA, on_result=sres.update, slot="quiz", kind="style")
-                    guide = (sres.get("structured_output") or {}).get("guide") or guide
-                    if guide and (sres.get("structured_output") or {}).get("guide"):
-                        save_style(subject, guide, info["sig"])
-                        send({"type": "tool", "label": "시험 스타일 저장함 → 문제 만드는 중"})
+                    so = sres.get("structured_output") or {}
+                    if so.get("guide"):
+                        guide, pool = so["guide"], so.get("pool") or []
+                        save_style(subject, guide, info["sig"], pool)
+                        picked = sum(1 for p in pool if p.get("picked"))
+                        send({"type": "tool", "label": f"시험 스타일 저장함 (문제 지도 {len(pool)}개, 시험에 뽑힌 문제 {picked}개) → 문제 만드는 중"})
                 send({"type": "style", "used": bool(guide or note), "files": len(info["files"]), "note": bool(note)})
             prompt = quiz_prompt(subject, (data.get("scope") or "").strip(), n, data.get("level", "보통"),
-                                 data.get("qtype", "mix"), guide, note)
+                                 data.get("qtype", "mix"), guide, note, pool)
             stream_claude(prompt, None, forward, QUIZ_SCHEMA, on_result=result.update, slot="quiz")
             qs = clean_questions((result.get("structured_output") or {}).get("questions") or [])
             if qs:
@@ -1273,6 +1416,53 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             send({"type": "error", "message": f"출제 실패: {exc}"})
             send({"type": "done"})
+        self.close_connection = True
+
+    def _quiz_websolve(self):
+        """퀴즈에서 '근거 없음' 문제 중 학생이 고른 것만 인터넷 검색을 켜고 다시 푼다. 결과는 퀴즈 기록에도 반영"""
+        data = json.loads(self._body())
+        path = record_path("quizzes", str(data.get("id", "")))
+        rec = json.loads(path.read_text(encoding="utf-8"))
+        qs = rec.get("qs") or []
+        idxs = sorted({int(i) for i in data.get("idxs", []) if 0 <= int(i) < len(qs)})[:10]
+        if not idxs:
+            return self._json({"error": "찾을 문제가 없어요"}, 400)
+        subject = safe_name((rec.get("cfg") or {}).get("subject", ""))
+        if not self._stream_start("quiz"):
+            return
+        send = self._sender("quiz")
+        result = {}
+
+        def forward(ev):
+            if ev["type"] not in ("text", "done", "session"):
+                send(ev)
+        try:
+            stream_claude(websolve_prompt(subject, [(i, qs[i]) for i in idxs]), None, forward, WEBSOLVE_SCHEMA,
+                          on_result=result.update, slot="quiz", kind="websolve", web=True)
+            got = (result.get("structured_output") or {}).get("items") or []
+            rec = json.loads(path.read_text(encoding="utf-8"))  # 그동안 푼 진행 상황이 저장됐을 수 있어 다시 읽는다
+            updated = {}
+            for it in got:
+                i = it.get("i")
+                if i not in idxs or i >= len(rec.get("qs", [])):
+                    continue
+                q = rec["qs"][i]
+                q["answer"], q["explanation"] = str(it.get("answer", q.get("answer", ""))), str(it.get("explanation", ""))
+                q["basis"] = it.get("basis") if it.get("basis") in ("자료", "인터넷") else "인터넷"
+                q["sources"] = [u for u in (it.get("sources") or []) if str(u).startswith(("http://", "https://"))][:5]
+                q["unsure"] = not it.get("confident", True)
+                if q.get("type") == "mcq" and 0 <= int(it.get("answer_index", -1)) <= 3:
+                    q["answer_index"] = int(it["answer_index"])
+                updated[i] = {k: q.get(k) for k in ("answer", "answer_index", "explanation", "basis", "sources", "unsure")}
+            if updated:
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
+                tmp.replace(path)
+            send({"type": "websolve", "updated": updated})
+            if not updated and not result.get("is_error"):
+                send({"type": "error", "message": "답을 찾지 못했어요. 나중에 다시 해보세요."})
+        except Exception as exc:
+            send({"type": "error", "message": f"인터넷 찾기 실패: {exc}"})
         self.close_connection = True
 
     def _studio_generate(self):

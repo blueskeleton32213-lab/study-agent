@@ -194,6 +194,24 @@ header { display: flex; align-items: center; gap: 4px; height: 58px; padding: 0 
 .fig.mmd .node.key rect, .fig.mmd .node.key polygon, .fig.mmd .node.key circle, .fig.mmd .node.key path { fill: var(--pen-soft) !important; stroke: var(--pen) !important; stroke-width: 2px !important; }
 .fig.mmd .node.info rect, .fig.mmd .node.info polygon, .fig.mmd .node.info circle, .fig.mmd .node.info path { fill: var(--hl-soft) !important; stroke: var(--hl) !important; }
 .fig.mmd .mmd-err { font-size: 13px; color: var(--amber); text-align: left; margin-bottom: 6px; }
+/* 계산 그래프 (```plot) — 색은 변수라 낮/밤을 따라간다 */
+.fig.plot { padding: 10px 8px 4px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+.fig.plot svg { display: block; width: 100%; max-width: 680px; height: auto; margin: 0 auto; font-family: var(--sans); }
+.fig.plot .pf { fill: none; stroke: var(--rule-strong); }
+.fig.plot .pg { stroke: var(--rule); stroke-width: 1; }
+.fig.plot .pz { stroke: var(--muted); stroke-width: 1; }
+.fig.plot .pm { stroke: var(--amber); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.fig.plot .pml { fill: var(--amber); font-size: 11.5px; }
+.fig.plot .pt { fill: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.fig.plot .pl { fill: var(--ink-2); font-size: 12.5px; }
+.fig.plot .ptl { fill: var(--ink); font-size: 14px; font-weight: 650; }
+.fig.plot .plg { fill: var(--surface); stroke: var(--rule); opacity: .92; }
+.fig.plot .ps { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.fig.plot .ps.dot { stroke-width: 1.6; }
+.fig.plot .s0 { stroke: var(--pen); } .fig.plot .s0.dot { fill: var(--pen); }
+.fig.plot .s1 { stroke: var(--hl); } .fig.plot .s1.dot { fill: var(--hl); }
+.fig.plot .s2 { stroke: var(--amber); } .fig.plot .s2.dot { fill: var(--amber); }
+.fig.plot .s3 { stroke: rgb(var(--rose-rgb)); } .fig.plot .s3.dot { fill: rgb(var(--rose-rgb)); }
 .fig.mmd pre { text-align: left; }
 .katex { font-size: 1.06em; }
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 6px 0; margin: .6em 0; }
@@ -261,6 +279,9 @@ body.cites-on .src.cite-src { display: block; }
 .aw-title { font-weight: 650; font-size: 14px; color: var(--ink); }
 .aw-sub { flex: 1; min-width: 0; color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .aw-head .icon-btn { cursor: pointer; }
+.aw-new { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px 0 7px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; flex-shrink: 0; }
+.aw-new:hover { background: var(--sunk); color: var(--ink); }
+.aw-new svg { width: 15px; height: 15px; }
 .aw-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
 .aw-quote { border-left: 3px solid var(--hl); background: var(--hl-soft); border-radius: 0 8px 8px 0; padding: 7px 10px; color: var(--ink-2); font-size: 13px; line-height: 1.55;
   white-space: pre-wrap; max-height: 9.5em; overflow: auto; flex-shrink: 0; }
@@ -395,6 +416,14 @@ main.studio #chat, main.studio .composer { display: none; }
 .verdict { display: flex; align-items: center; gap: 10px; margin-top: 24px; font-weight: 700; font-size: 16px; }
 .verdict .mark { font: 700 28px/1 var(--serif); }
 .verdict.correct { color: var(--green); } .verdict.partial { color: var(--amber); } .verdict.wrong { color: var(--red); }
+/* 해설 위 답의 근거 배지: 해설 / 강의자료 / 인터넷 / 근거 없음 */
+.basis { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 6px 0 8px; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid var(--rule); color: var(--ink-2); background: var(--sunk); }
+.basis.ok { color: var(--green); border-color: rgba(var(--green-rgb), .35); }
+.basis.doc { color: var(--hl); border-color: var(--hl-strong); background: var(--hl-soft); }
+.basis.web { color: var(--pen); border-color: rgba(var(--violet-rgb), .45); background: var(--pen-soft); }
+.basis.warn { color: var(--amber); border-color: var(--amber); }
+.basis .links { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; font-weight: 500; }
+.basis .links a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .verdict small { font-weight: 500; color: var(--muted); margin-left: auto; font-size: 12.5px; }
 .fb { margin-top: 10px; font-size: 15px; color: var(--ink); }
 .miss { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
@@ -469,6 +498,16 @@ main.studio #chat, main.studio .composer { display: none; }
   #printArea th, #printArea td { border: 1px solid #bbb; padding: 3pt 5pt; text-align: left; vertical-align: top; }
   #printArea h2 { font-size: 13pt; break-after: avoid; border-bottom: 1px solid #999; padding-bottom: 3pt; }
   #printArea tr { break-inside: avoid; }
+  /* 계산 그래프: 흰 종이에 맞는 색으로 */
+  #printArea .fig.plot { border: 1px solid #ccc; background: #fff; break-inside: avoid; }
+  #printArea .fig.plot .pt, #printArea .fig.plot .pml { fill: #555; }
+  #printArea .fig.plot .pl, #printArea .fig.plot .ptl { fill: #111; }
+  #printArea .fig.plot .pg { stroke: #e2e2e2; } #printArea .fig.plot .pf, #printArea .fig.plot .pz { stroke: #999; }
+  #printArea .fig.plot .plg { fill: #fff; stroke: #ccc; }
+  #printArea .fig.plot .s0 { stroke: #5b4bd6; } #printArea .fig.plot .s0.dot { fill: #5b4bd6; }
+  #printArea .fig.plot .s1 { stroke: #0d9488; } #printArea .fig.plot .s1.dot { fill: #0d9488; }
+  #printArea .fig.plot .s2 { stroke: #d97706; } #printArea .fig.plot .s2.dot { fill: #d97706; }
+  #printArea .fig.plot .s3 { stroke: #e11d48; } #printArea .fig.plot .s3.dot { fill: #e11d48; }
 }
 
 /* ── 창 (설정·만들기) ── */
@@ -739,6 +778,9 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
     <div class="mode-top">
       <button class="icon-btn" id="hvExit" title="닫기 (Esc)"></button>
       <span class="st-top-title">대화 기록</span>
+      <div class="seg" id="hvKind" role="tablist" aria-label="기록 종류" style="width:190px">
+        <button data-k="chats" class="on" role="tab">질문하기</button><button data-k="asks" role="tab">질문 창</button>
+      </div>
       <span class="st-sp"></span>
       <input id="hvSearch" type="search" placeholder="제목이나 내용으로 찾기" aria-label="대화 기록 검색">
     </div>
@@ -836,7 +878,7 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
 <section id="askWin" hidden aria-label="질문 창">
   <div class="aw-head" id="awHead" title="끌어서 옮길 수 있어요">
     <span data-i="ask"></span><span class="aw-title">질문 창</span><span class="aw-sub" id="awSub"></span>
-    <button class="icon-btn" id="awNew" title="새로 묻기 (이 창의 대화 지우기)"><span data-i="plus"></span></button>
+    <button class="aw-new" id="awNew" title="지금 대화는 저장하고 새 대화를 시작해요"><span data-i="plus"></span>새 대화</button>
     <button class="icon-btn" id="awClose" title="닫기 (Esc)"><span data-i="close"></span></button>
   </div>
   <div class="aw-body" id="awBody"></div>
@@ -1016,7 +1058,16 @@ document.querySelectorAll("[data-i]").forEach(el => { el.outerHTML = icon(el.dat
 $("#sendBtn").innerHTML = icon("send");
 for (const id of ["#qzExit", "#rvExit", "#stExit"]) $(id).innerHTML = icon("close");
 
+// 인터넷이 없으면 AI CLI가 답 없이 재시도만 해서 무한 로딩 → 보내기 전에 막고, 답하는 중에 끊기면 멈춘다 (서버도 한 번 더 확인)
+const OFFLINE = "인터넷에 연결되어 있지 않아요. 인터넷을 연결해서 사용해주세요.";
+const AI_PATHS = ["/api/chat", "/api/quiz/generate", "/api/studio/generate", "/api/quiz/grade", "/api/quiz/websolve"];
+const errText = (prefix, e) => e.message === OFFLINE ? OFFLINE : prefix + e.message;
+addEventListener("offline", () => {
+  fetch("/api/stop", { method: "POST", headers: { "X-Study-App": "1" }, body: "{}" }).catch(() => {});
+  toast(OFFLINE, 4000);
+});
 async function api(path, opts = {}) {
+  if (AI_PATHS.includes(path) && !navigator.onLine) throw new Error(OFFLINE);
   const res = await fetch(path, { ...opts, headers: { "X-Study-App": "1", ...(opts.headers || {}) } });
   if (!res.ok && !(opts.stream)) {
     let msg = res.statusText; try { msg = (await res.json()).error || msg; } catch {}
@@ -1067,7 +1118,7 @@ function md(text) {
     const math = [];
     const keep = (tex, display) => { math.push([tex, display]); return `@@MATH${math.length - 1}@@`; };
     let src = text
-      .replace(/```mermaid(?![\s\S]*```)[\s\S]*$/, () => keep("", "mmd-wait"))  // 아직 받는 중인(닫히지 않은) 다이어그램
+      .replace(/```(?:mermaid|plot)(?![\s\S]*```)[\s\S]*$/, () => keep("", "mmd-wait"))  // 아직 받는 중인(닫히지 않은) 다이어그램·그래프
       .replace(/```[\s\S]*?```|`[^`\n]*`/g, m => keep(m, null))
       .replace(PAGE_FIG_RE, (_, name, page, cap) => keep({ name: name.trim(), page, cap: (cap || "").trim() }, "page"))
       .replace(/\$\$([\s\S]+?)\$\$/g, (_, t) => keep(t, true))
@@ -1083,6 +1134,7 @@ function md(text) {
       const [tex, display] = math[+i];
       if (display === "page") return pageFig(tex);
       if (display === "mmd-wait") return '<div class="fig mmd wait"><span class="typing">그림 그리는 중</span></div>';
+      if (display === null && /^```plot\s*\n/.test(tex)) return plotFig(tex.replace(/^```plot\s*\n/, "").replace(/```$/, "").trim());
       if (display === null && /^```mermaid\s*\n/.test(tex)) return mermaidFig(tex.replace(/^```mermaid\s*\n/, "").replace(/```$/, "").trim());
       if (display === null) return DOMPurify.sanitize(tex.startsWith("```") ? marked.parse(tex) : marked.parseInline(tex));
       if (!window.katex) { const d = document.createElement("span"); d.textContent = display ? `$$${tex}$$` : `$${tex}$`; return d.innerHTML; }
@@ -1168,6 +1220,201 @@ function repaintMermaid() {  // 낮/밤 바꾸면 색을 다시 입힌다
   mmdCache.clear();
   document.querySelectorAll(".fig.mmd[data-src]").forEach(x => { x.classList.add("pending"); });
   paintMermaid();
+}
+
+/* ── 계산 그래프: ```plot {JSON} 블록 → 앱이 값을 계산해서 SVG로 그린다 (figure 스킬 참고) ──
+   AI는 식·범위·축 이름만 쓰고 그림은 보지 않는다 → 토큰이 적다. 색은 CSS 변수라 낮/밤을 따라간다.
+   식은 eval 없이 직접 만든 파서로 계산한다 (강의자료에 숨은 글이 코드를 실행하지 못하게). 복소수 지원: H(e^{jω}) 등 */
+const PLOT_FN = (() => {
+  const C = (re, im = 0) => [re, im], R = z => z[0];
+  const add = (a, b) => C(a[0] + b[0], a[1] + b[1]), sub = (a, b) => C(a[0] - b[0], a[1] - b[1]);
+  const mul = (a, b) => C(a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]);
+  const div = (a, b) => { const d = b[0] * b[0] + b[1] * b[1]; return C((a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d); };
+  const abs = z => Math.hypot(z[0], z[1]), arg = z => Math.atan2(z[1], z[0]);
+  const exp = z => { const r = Math.exp(z[0]); return C(r * Math.cos(z[1]), r * Math.sin(z[1])); };
+  const log = z => C(Math.log(abs(z)), arg(z));
+  const pow = (a, b) => {
+    if (!a[1] && !b[1] && (a[0] >= 0 || Number.isInteger(b[0]))) return C(Math.pow(a[0], b[0]));
+    if (!a[0] && !a[1]) return C(0);
+    return exp(mul(b, log(a)));
+  };
+  const sin = z => C(Math.sin(z[0]) * Math.cosh(z[1]), Math.cos(z[0]) * Math.sinh(z[1]));
+  const cos = z => C(Math.cos(z[0]) * Math.cosh(z[1]), -Math.sin(z[0]) * Math.sinh(z[1]));
+  const real = f => (...a) => C(f(...a.map(R)));
+  const fact = n => { n = Math.round(n); if (n < 0) return NaN; let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; };
+  return {
+    ops: { add, sub, mul, div, pow, neg: z => C(-z[0], -z[1]) },
+    fns: {
+      sin, cos, tan: z => div(sin(z), cos(z)), exp, log, ln: log, log10: z => div(log(z), C(Math.LN10)), log2: z => div(log(z), C(Math.LN2)),
+      sqrt: z => pow(z, C(0.5)), abs: z => C(abs(z)), arg: z => C(arg(z)), angle: z => C(arg(z)), phase: z => C(arg(z)),
+      real: z => C(z[0]), imag: z => C(z[1]), conj: z => C(z[0], -z[1]),
+      sinc: real(x => x === 0 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x)),  // numpy처럼 sin(πx)/(πx)
+      sign: real(Math.sign), floor: real(Math.floor), ceil: real(Math.ceil), round: real(Math.round),
+      atan: real(Math.atan), asin: real(Math.asin), acos: real(Math.acos), atan2: real(Math.atan2),
+      sinh: real(Math.sinh), cosh: real(Math.cosh), tanh: real(Math.tanh),
+      min: real(Math.min), max: real(Math.max), mod: real((a, b) => ((a % b) + b) % b),
+      step: real(x => x >= 0 ? 1 : 0), u: real(x => x >= 0 ? 1 : 0), delta: real(x => Math.abs(x) < 1e-9 ? 1 : 0),
+      rect: real(x => Math.abs(x) <= 0.5 ? 1 : 0), tri: real(x => Math.max(0, 1 - Math.abs(x))),
+      fact: real(fact), comb: real((n, k) => fact(n) / (fact(k) * fact(n - k))),
+      normpdf: real((x, m = 0, s = 1) => Math.exp(-((x - m) ** 2) / (2 * s * s)) / (s * Math.sqrt(2 * Math.PI))),
+      normcdf: real((x, m = 0, s = 1) => { const t = (x - m) / (s * Math.SQRT2), a = Math.abs(t), k = 1 / (1 + 0.3275911 * a);
+        const e = 1 - (((((1.061405429 * k - 1.453152027) * k) + 1.421413741) * k - 0.284496736) * k + 0.254829592) * k * Math.exp(-a * a);
+        return 0.5 * (1 + (t < 0 ? -e : e)); }),
+      exppdf: real((x, l = 1) => x < 0 ? 0 : l * Math.exp(-l * x)),
+      poisson: real((k, l) => k < 0 || !Number.isInteger(Math.round(k)) ? 0 : Math.exp(-l) * l ** Math.round(k) / fact(k)),
+      binom: real((k, n, p) => k < 0 || k > n ? 0 : fact(n) / (fact(k) * fact(n - k)) * p ** k * (1 - p) ** (n - k)),
+    },
+    consts: { pi: C(Math.PI), "π": C(Math.PI), e: C(Math.E), j: C(0, 1), i: C(0, 1), inf: C(Infinity) },
+  };
+})();
+function plotParse(src, vars) {  // 식 → (값들) => [re, im] 함수. 허용 안 된 이름·기호면 오류
+  const toks = String(src).match(/\d+\.?\d*(?:e[+-]?\d+)?|\.\d+(?:e[+-]?\d+)?|[A-Za-zωπθ_][A-Za-z0-9ωπθ_]*|\*\*|[-+*/^(),]|\S/gi) || [];
+  let p = 0;
+  const peek = () => toks[p], take = t => { if (toks[p] !== t) throw new Error(`'${t}'가 필요해요 (${src})`); p++; };
+  const { ops, fns, consts } = PLOT_FN;
+  const num = () => {
+    const t = toks[p++];
+    if (t === undefined) throw new Error(`식이 끝났어요 (${src})`);
+    if (/^[\d.]/.test(t)) { const v = +t; return () => [v, 0]; }
+    if (t === "(") { const e = expr(); take(")"); return e; }
+    if (/^[A-Za-zωπθ_]/.test(t)) {
+      if (peek() === "(") {
+        const f = fns[t.toLowerCase()]; if (!f) throw new Error(`모르는 함수: ${t}`);
+        p++; const args = [];
+        if (peek() !== ")") { args.push(expr()); while (peek() === ",") { p++; args.push(expr()); } }
+        take(")"); return env => f(...args.map(a => a(env)));
+      }
+      if (vars.includes(t)) return env => env[t];
+      const c = consts[t] ?? consts[t.toLowerCase()]; if (c) return () => c;
+      throw new Error(`모르는 이름: ${t} (변수는 ${vars.join(", ")})`);
+    }
+    throw new Error(`쓸 수 없는 기호: ${t}`);
+  };
+  const power = () => { const b = num(); if (peek() === "^" || peek() === "**") { p++; const e = unary(); return env => ops.pow(b(env), e(env)); } return b; };
+  const unary = () => { if (peek() === "-") { p++; const a = unary(); return env => ops.neg(a(env)); } if (peek() === "+") { p++; return unary(); } return power(); };
+  const term = () => { let a = unary(); while (peek() === "*" || peek() === "/") { const o = toks[p++] === "*" ? ops.mul : ops.div, l = a, r = unary(); a = env => o(l(env), r(env)); } return a; };
+  const expr = () => { let a = term(); while (peek() === "+" || peek() === "-") { const o = toks[p++] === "+" ? ops.add : ops.sub, l = a, r = term(); a = env => o(l(env), r(env)); } return a; };
+  const f = expr(); if (p < toks.length) throw new Error(`이해하지 못한 부분: ${toks.slice(p).join("")} (${src})`);
+  return f;
+}
+const plotNum = v => typeof v === "number" ? v : plotParse(v, [])({})[0];
+function plotTicks(lo, hi, piMode) {
+  const span = hi - lo || 1;
+  if (piMode) {
+    const steps = [1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8].map(s => s * Math.PI), st = steps.find(s => span / s <= 8) || steps.at(-1);
+    const out = []; for (let v = Math.ceil(lo / st - 1e-9) * st; v <= hi + 1e-9; v += st) out.push(v); return { vals: out, fmt: piLabel };
+  }
+  const raw = span / 6, mag = 10 ** Math.floor(Math.log10(raw)), st = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw);
+  const out = []; for (let v = Math.ceil(lo / st - 1e-9) * st; v <= hi + 1e-9 * span; v += st) out.push(Math.abs(v) < st * 1e-9 ? 0 : v);
+  return { vals: out, fmt: v => +v.toPrecision(4) + "" };
+}
+function piLabel(v) {
+  const q = Math.round(v / Math.PI * 8); if (!q) return "0";
+  let n = q, d = 8; const g = (a, b) => b ? g(b, a % b) : a, k = g(Math.abs(n), d); n /= k; d /= k;
+  const s = n < 0 ? "−" : "", a = Math.abs(n);
+  return `${s}${a === 1 ? "" : a}π${d === 1 ? "" : "/" + d}`;
+}
+const plotCache = new Map();
+function plotFig(code) {
+  if (plotCache.has(code)) return plotCache.get(code);
+  let html;
+  try { html = `<figure class="fig plot">${plotSvg(JSON.parse(code))}</figure>`; }
+  catch (e) { html = `<div class="fig mmd"><div class="mmd-err">그래프를 그리지 못했어요 — ${esc(e.message)}</div><pre><code>${esc(code)}</code></pre></div>`; }
+  plotCache.set(code, html); return html;
+}
+function plotSvg(spec) {
+  const X = spec.x || {}, v = X.var || "x", vars = [...new Set([v, "x"])];
+  const xlo = plotNum(X.from ?? 0), xhi = plotNum(X.to ?? 1), disc = !!X.discrete, xlog = X.scale === "log";
+  if (!(xhi > xlo)) throw new Error("x 범위(from < to)를 확인해 주세요");
+  if (xlog && xlo <= 0) throw new Error("로그 x축은 from이 0보다 커야 해요");
+  const piMode = X.ticks === "pi" || (X.ticks !== "num" && /pi|π/i.test(`${X.from} ${X.to}`));
+  const n = Math.min(2000, Math.max(20, X.n || 500));
+  const xs = disc ? Array.from({ length: Math.floor(xhi) - Math.ceil(xlo) + 1 }, (_, i) => Math.ceil(xlo) + i)
+    : Array.from({ length: n }, (_, i) => xlog ? xlo * (xhi / xlo) ** (i / (n - 1)) : xlo + (xhi - xlo) * i / (n - 1));
+  if (disc && xs.length > 400) throw new Error("이산 신호는 400개까지 그려요");
+  const panels = (spec.panels || [{ y: spec.y, lines: spec.lines }]).slice(0, 4);
+  const W = 640, ML = 58, MR = 16, PH = panels.length > 1 ? 210 : 260, top0 = spec.title ? 30 : 12, gap = 26, MB = 44;
+  const H = top0 + panels.length * PH + (panels.length - 1) * gap + MB;
+  const sx = xv => ML + (W - ML - MR) * (xlog ? Math.log(xv / xlo) / Math.log(xhi / xlo) : (xv - xlo) / (xhi - xlo));
+  const marks = (spec.marks || []).map(m => ({ x: plotNum(m.x), label: m.label || "" }));
+  let out = "", legend = [];
+  const t = s => esc(String(s ?? ""));
+  panels.forEach((pn, pi) => {
+    const Y = pn.y || {}, scale = Y.scale || "linear", y0 = top0 + pi * (PH + gap), y1 = y0 + PH;
+    const series = (pn.lines || []).slice(0, 6).map((ln, k) => {
+      let ys;
+      if (Array.isArray(ln.points)) {
+        const pts = ln.points.filter(q => Array.isArray(q) && q.length >= 2).map(q => [+q[0], +q[1]]);
+        return { label: ln.label, pts, k, stem: disc || ln.stem, table: true };
+      }
+      const f = plotParse(ln.f ?? ln.y ?? "", vars);
+      ys = xs.map(xv => { const z = f({ [v]: [xv, 0], x: [xv, 0] }); return Math.abs(z[1]) > 1e-9 * Math.max(1, Math.abs(z[0])) ? Math.hypot(z[0], z[1]) : z[0]; });
+      return { label: ln.label, pts: xs.map((xv, i) => [xv, ys[i]]), k, stem: disc || ln.stem };
+    });
+    if (!series.length) throw new Error("그릴 선(lines)이 없어요");
+    const tr = y => scale === "db" ? 20 * Math.log10(Math.abs(y)) : scale === "log" ? (y > 0 ? Math.log10(y) : NaN) : y;
+    series.forEach(s => s.pts = s.pts.map(([a, b]) => [a, tr(b)]));
+    const fin = series.flatMap(s => s.pts.map(q => q[1])).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!fin.length) throw new Error("계산된 값이 모두 무한대·정의되지 않음이에요");
+    const yIn = q => scale === "log" ? Math.log10(plotNum(q)) : plotNum(q);  // y.from/to: dB 축이면 dB 값 그대로, log 축이면 원래 값
+    let lo = Y.from != null ? yIn(Y.from) : fin[0], hi = Y.to != null ? yIn(Y.to) : fin.at(-1);
+    if (Y.from == null && Y.to == null && fin.length > 20) {  // 극점(무한대로 튀는 값) 때문에 나머지가 납작해지지 않게
+      const a = fin[Math.floor(fin.length * 0.02)], b = fin[Math.ceil(fin.length * 0.98) - 1], w = b - a || 1;
+      if (hi - b > 4 * w) hi = b + 0.15 * w; if (a - lo > 4 * w) lo = a - 0.15 * w;
+    }
+    if (scale === "db" && Y.from == null) lo = Math.max(lo, hi - 100);
+    if (Y.from == null && !disc && lo > 0 && scale === "linear" && lo < hi * 0.35) lo = 0;
+    if (disc && scale === "linear") { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+    if (hi - lo < 1e-12) { lo -= 1; hi += 1; }
+    const pad = (hi - lo) * 0.06; if (Y.from == null) lo -= pad; if (Y.to == null) hi += pad;
+    const sy = yv => y1 - (y1 - y0) * (yv - lo) / (hi - lo);
+    const clip = `pc${plotCache.size}_${pi}`;
+    out += `<clipPath id="${clip}"><rect x="${ML}" y="${y0}" width="${W - ML - MR}" height="${PH}"/></clipPath>`;
+    out += `<rect class="pf" x="${ML}" y="${y0}" width="${W - ML - MR}" height="${PH}"/>`;
+    const yt = plotTicks(lo, hi, false);
+    yt.vals.forEach(val => { const yy = sy(val).toFixed(1);
+      out += `<line class="pg" x1="${ML}" x2="${W - MR}" y1="${yy}" y2="${yy}"/><text class="pt" x="${ML - 6}" y="${yy}" text-anchor="end" dominant-baseline="middle">${scale === "log" ? "10^" + yt.fmt(val) : yt.fmt(val)}</text>`; });
+    const xt = xlog ? { vals: Array.from({ length: Math.floor(Math.log10(xhi)) - Math.ceil(Math.log10(xlo)) + 1 }, (_, i) => 10 ** (Math.ceil(Math.log10(xlo)) + i)), fmt: q => +q.toPrecision(3) + "" }
+      : plotTicks(xlo, xhi, piMode);
+    xt.vals.forEach(val => { const xx = sx(val).toFixed(1);
+      out += `<line class="pg" x1="${xx}" x2="${xx}" y1="${y0}" y2="${y1}"/>` + (pi === panels.length - 1 ? `<text class="pt" x="${xx}" y="${y1 + 16}" text-anchor="middle">${xt.fmt(val)}</text>` : ""); });
+    if (lo < 0 && hi > 0) out += `<line class="pz" x1="${ML}" x2="${W - MR}" y1="${sy(0).toFixed(1)}" y2="${sy(0).toFixed(1)}"/>`;
+    marks.forEach(m => { if (m.x >= xlo && m.x <= xhi) { const xx = sx(m.x).toFixed(1);
+      out += `<line class="pm" x1="${xx}" x2="${xx}" y1="${y0}" y2="${y1}"/>` + (pi === 0 && m.label ? `<text class="pml" x="${+xx + 4}" y="${y0 + 13}">${t(m.label)}</text>` : ""); } });
+    series.forEach(s => {
+      const cls = `ps s${s.k % 4}`;
+      if (s.stem) {
+        const base = sy(Math.min(Math.max(0, lo), hi)).toFixed(1);
+        s.pts.forEach(([a, b]) => { if (!Number.isFinite(b)) return; const xx = sx(a).toFixed(1), yy = sy(Math.min(Math.max(b, lo), hi)).toFixed(1);
+          out += `<line class="${cls}" x1="${xx}" x2="${xx}" y1="${base}" y2="${yy}"/><circle class="${cls} dot" cx="${xx}" cy="${yy}" r="3.4"/>`; });
+      } else {
+        let d = "", pen = false;
+        s.pts.forEach(([a, b], i) => {
+          const prev = s.pts[i - 1];  // 극점·불연속(tan 등)에서 세로로 잇지 않는다
+          const jump = !s.table && prev && Number.isFinite(prev[1]) && Number.isFinite(b) && Math.abs(b - prev[1]) > 0.4 * (hi - lo);
+          if (!Number.isFinite(b) || jump) { pen = false; if (!Number.isFinite(b)) return; }
+          d += `${pen ? "L" : "M"}${sx(a).toFixed(1)},${sy(Math.min(Math.max(b, lo - (hi - lo)), hi + (hi - lo))).toFixed(1)}`; pen = true;
+        });
+        out += `<path class="${cls}" clip-path="url(#${clip})" d="${d}"/>`;
+        if (s.table && s.pts.length <= 60) s.pts.forEach(([a, b]) => { if (Number.isFinite(b) && b >= lo && b <= hi) out += `<circle class="${cls} dot" cx="${sx(a).toFixed(1)}" cy="${sy(b).toFixed(1)}" r="3.2"/>`; });
+      }
+      if (s.label) legend.push([pi, s.k, s.label]);
+    });
+    const yl = Y.label ? `${Y.label}${scale === "db" && !/db/i.test(Y.label) ? " (dB)" : ""}` : scale === "db" ? "dB" : "";
+    if (yl) out += `<text class="pl" transform="translate(14 ${(y0 + y1) / 2}) rotate(-90)" text-anchor="middle">${t(yl)}</text>`;
+    const lg = legend.filter(q => q[0] === pi);
+    if (lg.length) {
+      const tw = s => [...s].reduce((a, ch) => a + (/[ᄀ-ᇿ㄰-㆏가-힯]/.test(ch) ? 12.5 : 7), 0);  // 한글은 넓게
+      const lw = Math.min(300, 34 + Math.max(...lg.map(q => tw(String(q[2])))));
+      out += `<rect class="plg" x="${W - MR - lw - 6}" y="${y0 + 6}" width="${lw}" height="${lg.length * 18 + 8}" rx="6"/>`;
+      lg.forEach(([, k, lab], i) => { const yy = y0 + 19 + i * 18;
+        out += `<line class="ps s${k % 4}" x1="${W - MR - lw + 2}" x2="${W - MR - lw + 20}" y1="${yy}" y2="${yy}"/><text class="pt" x="${W - MR - lw + 26}" y="${yy}" dominant-baseline="middle">${t(lab)}</text>`; });
+    }
+  });
+  if (spec.title) out = `<text class="ptl" x="${ML}" y="18">${t(spec.title)}</text>` + out;
+  if (X.label) out += `<text class="pl" x="${(ML + W - MR) / 2}" y="${H - 8}" text-anchor="middle">${t(X.label)}</text>`;
+  const alt = `${spec.title || "그래프"}: ${(spec.panels || [spec]).flatMap(p => (p.lines || []).map(l => l.label || l.f)).join(", ")}`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${attr(alt)}">${out}</svg>`;
 }
 
 /* ── 출처 링크: 실제 자료 파일명과 일치하는 것만 링크로 ── */
@@ -1376,9 +1623,21 @@ async function loadState(opt = {}) {
 let expanded = null; // 자료 목록이 펼쳐진 과목
 const stemOf = f => f.replace(/\.[^.]+$/, "");  // 확장자를 빼고 비교해야 "Intro"가 "Intro (Contd)"보다 앞에 온다
 const natural = (a, b) => stemOf(a).localeCompare(stemOf(b), "ko", { numeric: true, sensitivity: "base" });
-// 강의 번호가 있는 파일(Lecture 3, 2주차, 챕터5, Week1…)을 먼저 번호순으로, 나머지(해설·모의고사 등)는 뒤에 이름순으로
-const lectureNo = f => { const m = f.match(/(?:lecture|week|ch(?:apter)?|챕터)\s*[_\-]?\s*(\d+)|(\d+)\s*(?:주차|강)/i); return m ? +(m[1] ?? m[2]) : null; };
+// 자료 순서: 강의(Lecture 3, 2주차, Week1…) → 교재 챕터(Chapter 5, 챕터5) → 문제·시험 자료 → 나머지.
+// 묶음마다 번호순. 묶음을 먼저 나누지 않으면 "6주차"와 "Chapter 6"·"Chapter06_Question"처럼 번호만 같은 다른 자료가 섞인다
+// iClass·Mac에서 온 파일 이름은 한글이 풀어쓴 형태(NFD)라 "주차"·"퀴즈"가 안 맞는다 → NFC로 맞춘 뒤 비교
+const lectureNo = f => { const m = f.normalize("NFC").match(/(?:lecture|week|ch(?:apter)?|챕터)\s*[_\-]?\s*(\d+)|(\d+)\s*(?:주차|강|장)/i); return m ? +(m[1] ?? m[2]) : null; };
+const EXAM_RE = /question|문제|퀴즈|quiz|해설|solution|답안|정답|기출|모의|형광펜|exam|세트|\bset\b/i;  // 이름에 있으면 무조건 시험 자료
+const EXAM_WEAK = /중간|기말|시험/;  // "Lecture14_중간범위요약"처럼 강의 번호가 있으면 강의 쪽에 둔다
+const fileGroup = f => {
+  f = f.normalize("NFC");
+  if (EXAM_RE.test(f)) return 2;
+  if (/lecture|week|\d\s*(?:주차|강|장)/i.test(f)) return 0;
+  if (EXAM_WEAK.test(f)) return 2;
+  return /ch(?:apter)?\s*[_\-]?\s*\d|챕터/i.test(f) ? 1 : 3;
+};
 const byLecture = (a, b) => {
+  const g = fileGroup(a) - fileGroup(b); if (g) return g;
   const x = lectureNo(a), y = lectureNo(b);
   if (x !== null && y !== null) return x - y || natural(a, b);
   if (x !== null || y !== null) return x !== null ? -1 : 1;
@@ -1650,8 +1909,9 @@ async function send(message, shown) {
       }
     }
   } catch (e) {
-    errored = true; const el = document.createElement("div"); el.className = "err"; el.textContent = "서버와 연결이 끊겼어요: " + e.message; inner.append(el);
+    errored = true; const el = document.createElement("div"); el.className = "err"; el.textContent = errText("서버와 연결이 끊겼어요: ", e); inner.append(el);
   }
+  if (!text && !errored && !navigator.onLine) { errored = true; const el = document.createElement("div"); el.className = "err"; el.textContent = OFFLINE; inner.append(el); }
   typing.remove(); paint();
   if (!tools.children.length) tools.remove();
   if (!text && !errored) body.innerHTML = '<span class="typing" style="animation:none">(멈췄어요)</span>';
@@ -1911,6 +2171,17 @@ const ICLASS_RE = /((i-?class|아이클래스).*(받아\s*(줘|와|오|올|놔|�
 
 /* ── 메뉴·머리 버튼 ── */
 const scope = () => current ? ` ${current}` : "";
+// 약점 분석: 복습 카드 + 질문하기·질문 창 대화를 서버에서 모아 /weak 요청에 붙인다 (앱의 Claude가 스크립트를 돌리지 않아도 되게)
+async function weakAnalysis(subject) {
+  if (busy) return toast("답변이 끝난 뒤에 눌러주세요");
+  let c, log;
+  try { c = await (await api(`/api/weak/check?subject=${encodeURIComponent(subject)}`)).json(); }
+  catch (e) { return toast(e.message); }
+  if (!c.cards && !c.chats && !c.asks) return toast(`${subject}에 아직 분석할 기록이 없어요. 퀴즈를 풀거나 질문을 해보세요`, 3500);
+  try { log = (await (await api(`/api/weak/log?subject=${encodeURIComponent(subject)}`)).json()).log; }
+  catch (e) { return toast(e.message); }
+  send(`/weak ${subject}\n\n[공부 기록 — 복습 카드 ${c.cards}장 · 질문하기 질문 ${c.chats}개 · 질문 창 질문 ${c.asks}개]\n${log}`, `약점 분석 (${subject})`);
+}
 document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
   const a = b.dataset.act;
   if (a === "chat") {
@@ -1940,8 +2211,7 @@ document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
   const cur = state.subjects.find(s => s.name === current);
   if ((a === "weak" || a === "ingest") && !cur) return toast("먼저 왼쪽 + 버튼으로 과목을 만들어 주세요");
   if (a === "ingest" && !cur.files.length) return toast(`${cur.name}에 아직 자료가 없어요. 파일을 과목 이름 위로 끌어다 놓으세요`, 3500);
-  if (a === "weak" && !cur.cards) return toast(`${cur.name}에 아직 틀린 문제 기록이 없어요. 퀴즈를 먼저 풀어보세요`, 3500);
-  if (a === "weak") return send(`/weak${scope()}`, `약점 분석 (${current})`);
+  if (a === "weak") return weakAnalysis(cur.name);
   if (a === "ingest") return send(`/ingest${scope()}`, `자료 요약 (${current})`);
 });
 $("#quizDlg").addEventListener("close", async () => {
@@ -2207,7 +2477,8 @@ async function openHistory() {
   if (qz || ql) closeQuiz();
   if (st) closeStudio();
   if (rv || quizShown() || studioShown()) return;
-  hv = { chats: [], q: "", subj: "" };  // subj: "" = 전체, null = 과목 없음
+  hv = { chats: [], q: "", subj: "", kind: hvKind };  // subj: "" = 전체, null = 과목 없음 / kind: chats(질문하기) · asks(질문 창)
+  $("#hvKind").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.k === hv.kind));
   $("#hvSearch").value = "";
   $("main").classList.add("histing"); $("#historyv").hidden = false;
   $("#hvExit").innerHTML = icon("close");
@@ -2216,9 +2487,16 @@ async function openHistory() {
   $("#hvSearch").focus();
 }
 function closeHistory() { hv = null; $("main").classList.remove("histing"); $("#historyv").hidden = true; }
+let hvKind = "chats";  // 마지막으로 본 탭 (다시 열 때 그대로)
+$("#hvKind").querySelectorAll("button").forEach(b => b.onclick = () => {
+  if (!hv || hv.kind === b.dataset.k) return;
+  hv.kind = hvKind = b.dataset.k; hv.subj = "";
+  $("#hvKind").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  loadChats();
+});
 async function loadChats() {
   if (!hv) return;
-  try { hv.chats = (await (await api("/api/chats")).json()).chats; }
+  try { hv.chats = (await (await api(`/api/${hv.kind}`)).json()).chats; }
   catch (e) { hv.chats = []; toast(e.message); }
   renderChats();
 }
@@ -2255,12 +2533,13 @@ function renderChats() {
   for (const c of list) { const g = chatGroup(c.updated); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(c); }
   const where = hv.subj === "" ? "" : `${hv.subj ?? "과목 없음"}에서 `;
   $("#hvStage").innerHTML = `<div class="st-wrap">${chips}${!hv.chats.length
-      ? '<div class="blank">아직 저장된 대화가 없어요. 질문하기에서 대화를 시작하면 자동으로 기록돼요.</div>'
+      ? (hv.kind === "asks" ? '<div class="blank">아직 저장된 질문 창 대화가 없어요. 퀴즈·정리 자료·답변에서 문장을 드래그하고 「이 부분 물어보기」로 물으면 자동으로 기록돼요.</div>'
+                             : '<div class="blank">아직 저장된 대화가 없어요. 질문하기에서 대화를 시작하면 자동으로 기록돼요.</div>')
       : !list.length ? `<div class="blank">${q ? `${esc(where)}"${esc(hv.q)}"에 맞는 대화가 없어요.` : `${esc(where)}나눈 대화가 없어요.`}</div>`
       : [...groups].map(([g, cs]) => `<div class="chat-group"><div class="st-h">${g}</div><div class="chat-list">${cs.map(c => `
-        <div class="chat-row${c.id === chatId ? " current" : ""}" data-id="${c.id}" role="button" tabindex="0" title="눌러서 이 대화를 열어요">
-          <span class="ic">${icon("chat")}</span>
-          <span class="tx"><b>${esc(c.title)}</b>${meta([c.subject, `메시지 ${c.count}개`])}</span>
+        <div class="chat-row${c.id === (hv.kind === "asks" ? aw.id : chatId) ? " current" : ""}" data-id="${c.id}" role="button" tabindex="0" title="${hv.kind === "asks" ? "눌러서 질문 창에서 이어가요" : "눌러서 이 대화를 열어요"}">
+          <span class="ic">${icon(hv.kind === "asks" ? "ask" : "chat")}</span>
+          <span class="tx"><b>${esc(c.title)}</b>${meta([c.subject, c.scope, `메시지 ${c.count}개`])}</span>
           <span class="when">${esc(chatWhen(c.updated))}</span>
           <span class="ops"><button class="icon-btn ren" title="제목 바꾸기" aria-label="제목 바꾸기">${icon("edit", 16)}</button><button class="icon-btn del" title="삭제" aria-label="삭제">${icon("trash", 16)}</button></span>
         </div>`).join("")}</div></div>`).join("")}</div>`;
@@ -2269,8 +2548,9 @@ function renderChats() {
   });
   $("#hvStage").querySelectorAll(".chat-row").forEach(row => {
     const id = row.dataset.id;
-    row.onclick = () => openChat(id);
-    row.onkeydown = e => { if (e.key === "Enter" && e.target === row) openChat(id); };
+    const open = () => hv.kind === "asks" ? openAskRecord(id) : openChat(id);
+    row.onclick = open;
+    row.onkeydown = e => { if (e.key === "Enter" && e.target === row) open(); };
     row.querySelector(".del").onclick = e => { e.stopPropagation(); deleteChat(id); };
     row.querySelector(".ren").onclick = e => { e.stopPropagation(); renameChat(id); };
   });
@@ -2289,8 +2569,9 @@ async function openChat(id) {
 async function deleteChat(id) {
   const c = hv?.chats.find(x => x.id === id);
   if (!await ask({ title: "대화 기록을 삭제할까요?", desc: `"${c?.title || "이 대화"}" 기록을 컴퓨터 휴지통으로 옮겨요. 휴지통에서 복원할 수 있어요.`, ok: "삭제", danger: true })) return;
-  try { await api("/api/chats/delete", { method: "POST", body: JSON.stringify({ id }) }); } catch (e) { return toast(e.message); }
-  if (id === chatId) {  // 지금 보고 있던 대화를 지웠으면 새 대화로
+  try { await api(`/api/${hv.kind}/delete`, { method: "POST", body: JSON.stringify({ id }) }); } catch (e) { return toast(e.message); }
+  if (hv.kind === "asks") { if (id === aw.id) aw.id = null; }  // 열려 있는 질문 창은 그대로, 다음 답부터 새 기록으로
+  else if (id === chatId) {  // 지금 보고 있던 대화를 지웠으면 새 대화로
     history = []; sessionId = null; chatId = null;
     store.set("history", []); store.set("session", null); store.set("chatId", null); renderHistory();
   }
@@ -2301,7 +2582,7 @@ async function renameChat(id) {
   const c = hv?.chats.find(x => x.id === id);
   const title = await ask({ title: "대화 제목 바꾸기", label: "제목", value: c?.title || "", ok: "바꾸기" });
   if (!title) return;
-  try { await api("/api/chats/rename", { method: "POST", body: JSON.stringify({ id, title }) }); } catch (e) { return toast(e.message); }
+  try { await api(`/api/${hv.kind}/rename`, { method: "POST", body: JSON.stringify({ id, title }) }); } catch (e) { return toast(e.message); }
   loadChats();
 }
 document.addEventListener("keydown", e => {
@@ -2534,6 +2815,62 @@ async function startQuiz(cfg) {
   if (ql) { if (me.qs.length) { qz = null; loadQuizList(); } else renderQuizList(); }  // 목록을 보던 중이면 목록에 바로 나타나게
   else renderQuiz();
   if ($("#quizv").hidden) toast(me.qs.length ? "퀴즈 문제가 준비됐어요. 왼쪽 퀴즈 메뉴에서 풀 수 있어요" : "퀴즈를 만들지 못했어요. 퀴즈 메뉴에서 확인해 주세요");
+  if (qz === me && me.qs.length && !$("#quizv").hidden) offerWebSolve(me);
+}
+
+// 강의자료에서 답의 근거를 못 찾은 문제(basis "근거 없음")가 있으면, 몇 문제를 인터넷에서 찾을지 먼저 묻는다 (검색은 토큰이 커서)
+async function offerWebSolve(me) {
+  const miss = me.qs.map((q, i) => q.basis === "근거 없음" ? i : -1).filter(i => i >= 0);
+  if (!miss.length || !me.id || me.web) return;
+  const v = await ask({
+    title: `강의자료에서 답의 근거를 못 찾은 문제가 ${miss.length}개예요`,
+    desc: "몇 문제를 인터넷에서 찾아볼까요? 앞 번호부터 찾고, 한 문제에 수천 토큰이 들어요. 0이면 찾지 않아요. 인터넷에서 찾은 답에는 🌐 표시와 출처 링크가 붙어요.",
+    label: `인터넷에서 찾을 문제 수 (0~${Math.min(miss.length, 10)})`, value: String(Math.min(miss.length, 10)), ok: "찾기", cancel: "찾지 않기" });
+  const n = Math.min(parseInt(v, 10) || 0, miss.length, 10);
+  if (n <= 0) return;
+  const idxs = miss.slice(0, n);
+  me.web = { busy: true, idxs };
+  toast(`${n}문제의 답을 인터넷에서 찾는 중이에요. 그동안 계속 풀어도 돼요`, 3500);
+  if (qz === me && quizShown()) renderQuiz();
+  let updated = null, err = null;
+  try {
+    const res = await api("/api/quiz/websolve", { method: "POST", stream: true, body: JSON.stringify({ id: me.id, idxs }) });
+    if (!res.ok) { let m = res.statusText; try { m = (await res.json()).error; } catch {} throw new Error(m); }
+    const reader = res.body.getReader(), dec = new TextDecoder(); let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const ev = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1);
+        if (ev.type === "websolve") updated = ev.updated;
+        else if (ev.type === "error") err = ev.message;
+      }
+    }
+  } catch (e) { err = e.message; }
+  me.web = null;
+  const got = Object.entries(updated || {});
+  for (const [k, u] of got) {
+    const q = me.qs[+k]; if (!q) continue;
+    const before = q.answer_index;
+    Object.assign(q, u);
+    if (q.type === "mcq" && q.user != null && q.verdict && before !== q.answer_index) {  // 이미 푼 객관식인데 정답이 바뀌었으면 다시 채점
+      q.verdict = q.user === q.answer_index ? "correct" : "wrong"; q.rechecked = true;
+    }
+  }
+  if (got.length) saveQuiz(me);
+  const web = got.filter(([, u]) => u.basis === "인터넷").length;
+  toast(got.length ? `${got.length}문제의 답을 다시 찾았어요${web ? ` (🌐 인터넷 참고 ${web}문제)` : " (강의자료에서 찾음)"}` : `인터넷에서 답을 찾지 못했어요${err ? ": " + err : ""}`, 4000);
+  if (qz === me && quizShown()) renderQuiz();
+}
+// 해설 위에 붙는 답의 근거 배지
+function basisBadge(q) {
+  const m = { "해설": ["ok", "✅ 해설 기준"], "자료": ["doc", "📄 강의자료로 풀었어요"], "인터넷": ["web", "🌐 인터넷 참고 — 강의자료에는 없는 내용"], "근거 없음": ["warn", "⚠ 강의자료에서 근거를 찾지 못했어요"] }[q.basis];
+  if (!m) return "";
+  const links = (q.sources || []).filter(u => /^https?:\/\//.test(u)).map(u => {
+    let host = u; try { host = new URL(u).hostname.replace(/^www\./, ""); } catch {}
+    return `<a href="${attr(u)}" target="_blank" rel="noopener noreferrer">${esc(host)}</a>`;
+  }).join("");
+  return `<div class="basis ${m[0]}">${m[1]}${q.unsure ? " · ⚠ 검토 필요" : ""}${q.rechecked ? " · 정답이 바뀌어 다시 채점했어요" : ""}${links ? `<span class="links">${links}</span>` : ""}</div>`;
 }
 
 function qHeader(q) {
@@ -2586,7 +2923,8 @@ function renderQuiz() {
     if (q.feedback) body += `<div class="fb bubble md">${md(q.feedback)}</div>`;
     if (q.missing?.length && q.verdict !== "correct") body += `<div class="miss">${q.missing.map(m => `<span>${esc(m)}</span>`).join("")}</div>`;
     if (q.type === "short") body += `<div class="part model"><b>모범답안</b><div class="bubble md">${md(q.answer)}</div></div>`;
-    body += `<div class="part"><b>해설</b><div class="bubble md">${md(q.explanation)}</div></div>
+    const looking = qz.web?.busy && qz.web.idxs.includes(qz.idx) ? '<div class="basis web">🌐 인터넷에서 이 문제의 답을 찾는 중이에요 — 끝나면 해설이 바뀌어요</div>' : "";
+    body += `<div class="part"><b>해설</b>${looking || basisBadge(q)}<div class="bubble md">${md(q.explanation)}</div></div>
       <div class="src cite-src">출처 ${linkCites(esc(q.source))}</div>`;
   }
   stage.innerHTML = `<div class="sheet">${body}</div>`;
@@ -3200,8 +3538,14 @@ document.addEventListener("keydown", e => {
 });
 
 /* ── 질문 창: 드래그한 부분을 붙여서, 보던 화면(퀴즈·정리 자료)을 떠나지 않고 묻는다 ── */
-// 서버의 따로 된 실행 칸(ask)을 써서 질문하기 화면의 답변과 서로 기다리지 않는다. 이 창의 대화는 「새로 묻기」를 누를 때까지 이어진다
-let aw = { session: null, quote: null, busy: false, items: 0, subject: null };  // subject: 이 창 대화의 과목 (이어 묻는 질문도 같은 과목으로)
+// 서버의 따로 된 실행 칸(ask)을 써서 질문하기 화면의 답변과 서로 기다리지 않는다.
+// 대화는 범위(scope)마다 따로: 이 퀴즈 / 이 정리 자료 / 복습 / 질문하기 답변. 다른 범위에서 드래그하면 그 범위의 대화로 바뀌고
+// (보던 대화는 저장된 채 기억해 두었다가 돌아오면 이어감), AI에게도 이 범위 질문만 받게 한다 → 대화가 길게 섞이지 않아 토큰이 준다.
+// subject: 이 창 대화의 과목 / id·log: data/asks에 따로 모아두는 기록 (약점 분석에도 쓰임)
+const AW_NEW = (scope = null) => ({ session: null, quote: null, busy: false, items: 0, subject: null, id: null, log: [], scope });
+let aw = AW_NEW();
+const awByScope = new Map();  // 범위 key → 그 범위에서 하던 대화 (앱을 켜 둔 동안)
+const awTag = o => o && (o.askKey ||= Math.random().toString(36).slice(2, 10));  // 퀴즈·복습마다 하나의 범위
 const AW_WHERE = { stStage: "정리 자료", qzStage: "퀴즈", rvStage: "복습 카드", msgs: "답변", askWin: "질문 창 답변" };
 const AW_CHIPS = ["쉽게 설명해줘", "예시를 들어줘", "왜 그런지 알려줘", "시험엔 어떻게 나와?"];
 function askPick(range, scope, text, cites) {
@@ -3224,16 +3568,32 @@ function askPick(range, scope, text, cites) {
   const subject = (id === "stStage" && st?.subject) || (id === "qzStage" && qz?.cfg?.subject)
     || (id === "rvStage" && rv?.queue?.[0]?.card?.subject) || (id === "msgs" && anc.closest(".msg")?.dataset.subj)
     || (id === "askWin" && aw.subject) || current;
-  return { text: text.trim().slice(0, 1500), where, context: parts.join("\n").slice(0, 1200), subject,
+  const sc = id === "stStage" && st?.doc ? { key: `studio:${st.doc.path}`, label: `정리 자료 · ${st.doc.title}` }
+    : id === "qzStage" && qz ? { key: `quiz:${awTag(qz)}`, label: `퀴즈 · ${qz.title || `${qz.cfg.subject} ${qz.cfg.scope || "전체 범위"}`}` }
+    : id === "rvStage" && rv ? { key: `review:${awTag(rv)}`, label: "복습 카드" }
+    : id === "askWin" ? aw.scope
+    : { key: `chat:${chatId || "new"}`, label: "질문하기 답변" };
+  return { text: text.trim().slice(0, 1500), where, context: parts.join("\n").slice(0, 1200), subject, scope: sc,
            solving: id === "qzStage" && !!qz && qz.phase === "answer",
            cites: cites.map(a => a.dataset.full || a.textContent) };
 }
 function awScroll() { const b = $("#awBody"); b.scrollTop = b.scrollHeight; }
 function awRender() {
   if (!aw.items && !aw.quote) $("#awBody").innerHTML = '<div class="aw-empty">퀴즈·정리 자료·답변에서 문장을 드래그하고<br>「이 부분 물어보기」를 누르면 여기서 물어볼 수 있어요.</div>';
-  $("#awSub").textContent = aw.quote ? `${aw.quote.where}에서` : "";
+  $("#awSub").textContent = aw.scope?.label || (aw.quote ? `${aw.quote.where}에서` : "");
+  $("#awSub").title = aw.scope ? `이 창은 ${aw.scope.label}에 대한 질문만 받아요` : "";
+}
+function awSwitch(next) {  // 지금 대화를 기억해 두고 next 대화를 창에 그린다
+  if (aw.scope && aw.items) awByScope.set(aw.scope.key, aw);
+  aw = next;
+  $("#awBody").innerHTML = ""; $("#awChips").hidden = true;
+  aw.log.forEach(awMsg);
 }
 function openAsk(picked) {
+  if (picked.scope && picked.scope.key !== aw.scope?.key) {
+    if (aw.busy) return toast("질문 창 답변이 끝난 뒤에 다른 화면의 내용을 물어볼 수 있어요");
+    awSwitch(awByScope.get(picked.scope.key) || AW_NEW(picked.scope));
+  }
   $("#askWin").hidden = false;
   if (!aw.items) $("#awBody").innerHTML = "";
   $("#awBody").querySelector(".aw-quote.pending")?.remove();  // 아직 안 보낸 인용은 새 인용으로 바꾼다
@@ -3248,15 +3608,45 @@ function openAsk(picked) {
   awRender(); awScroll(); $("#awInput").focus();
 }
 function closeAsk() { $("#askWin").hidden = true; }
-function resetAsk() {
+async function saveAsk(me) {  // 답을 받을 때마다 data/asks에 저장 (질문하기 대화와 따로)
+  if (!me.log.some(m => m.role === "user")) return;
+  try {
+    const r = await (await api("/api/asks/save", { method: "POST", body: JSON.stringify({ id: me.id, subject: me.subject || current, session_id: me.session, messages: me.log, scope: me.scope }) })).json();
+    me.id = r.id;
+  } catch (e) { toast("질문 창 대화를 기록하지 못했어요: " + e.message); }
+}
+function awMsg(m) {  // 저장된 질문 창 대화를 다시 그린다
+  const body = $("#awBody");
+  if (m.quote) { const q = document.createElement("div"); q.className = "aw-quote"; q.innerHTML = `<small>${esc(m.quote.where)}에서 고른 부분</small>`; q.append(m.quote.text); body.append(q); }
+  const d = document.createElement("div");
+  if (m.role === "user") { d.className = "aw-user"; d.textContent = m.text; }
+  else { d.className = "aw-bot bubble md"; d.innerHTML = md(m.text); }
+  body.append(d);
+}
+async function openAskRecord(id) {  // 대화 기록 → 질문 창 탭에서 열면 그 대화를 질문 창에 불러와 이어간다
+  if (aw.busy) return toast("질문 창 답변이 끝난 뒤에 열 수 있어요");
+  let rec;
+  try { rec = await (await api(`/api/asks/get?id=${id}`)).json(); } catch (e) { return toast(e.message); }
+  const next = { ...AW_NEW(rec.scope || null), session: rec.session_id || null, subject: rec.subject || null, id: rec.id, log: rec.messages || [] };
+  next.items = next.log.filter(m => m.role === "user").length;
+  closeHistory();
+  awSwitch(next);
+  $("#askWin").hidden = false; awRender(); awScroll(); $("#awInput").focus();
+}
+function resetAsk() {  // 「새 대화」: 지금 대화는 이미 답마다 저장돼 있다 → 같은 범위에서 빈 대화로
   if (aw.busy) api("/api/stop", { method: "POST", body: JSON.stringify({ kind: "ask" }) });
-  aw = { session: null, quote: null, busy: false, items: 0, subject: null };
-  $("#awChips").hidden = true; awRender(); $("#awInput").focus();
+  const had = aw.items > 0, scope = aw.scope;
+  if (scope) awByScope.delete(scope.key);
+  aw = AW_NEW(scope);
+  $("#awBody").innerHTML = ""; $("#awChips").hidden = true; awRender(); $("#awInput").focus();
+  if (had) toast("이전 대화는 대화 기록 → 질문 창에 저장했어요");
 }
 function askMessage(q) {
   const quote = aw.quote, subject = quote?.subject || aw.subject || current;
   let m = subject ? `[현재 과목: ${subject}]\n` : "";
-  if (!quote) return m + q;
+  if (aw.scope) m += `[질문 창 범위: ${aw.scope.label} — 이 범위에 대한 질문만 답한다. 관련 없는 질문이면 한 줄로 "질문하기에서 물어봐 주세요"라고만 답한다.]\n`;
+  const solving = quote ? quote.solving : aw.scope?.key.startsWith("quiz:") && qz?.phase === "answer";
+  if (!quote) return m + (solving ? "학생은 아직 문제를 푸는 중이다. 정답은 말하지 말고 힌트로만 돕는다 (답을 달라고 하면 그때).\n" : "") + q;
   m += `[질문 창 — 학생이 ${quote.where}에서 드래그한 부분에 대해 묻는다. 답은 핵심 위주로 짧게(10줄 안팎).]\n`;
   m += `드래그한 부분: «${quote.text}»\n`;
   if (quote.context) m += `${quote.context}\n`;
@@ -3268,7 +3658,8 @@ async function askSend(text) {
   const q = (text ?? $("#awInput").value).trim();
   if (!q || aw.busy) return;
   const inp = $("#awInput"); inp.value = ""; inp.style.height = "auto";
-  const message = askMessage(q);
+  const message = askMessage(q), quote = aw.quote;
+  aw.log.push({ role: "user", text: q, ...(quote ? { quote: { where: quote.where, text: quote.text } } : {}) });
   const body = $("#awBody");
   if (!aw.items && !aw.quote) body.innerHTML = "";
   body.querySelector(".aw-quote.pending")?.classList.remove("pending");
@@ -3301,10 +3692,13 @@ async function askSend(text) {
         else if (ev.type === "error") err(ev.message);
       }
     }
-  } catch (e) { err("답을 받지 못했어요: " + e.message); }
+  } catch (e) { err(errText("답을 받지 못했어요: ", e)); }
   if (mine !== aw) return;
+  if (!acc && !bot.querySelector(".err") && !navigator.onLine) err(OFFLINE);
   typing.remove(); paint(); if (!tools.children.length) tools.remove();
   if (!acc && !bot.querySelector(".err")) out.innerHTML = '<span class="typing" style="animation:none">(멈췄어요)</span>';
+  aw.log.push({ role: "bot", text: acc || (bot.querySelector(".err") ? "(오류)" : "(멈췄어요)") });
+  saveAsk(aw);
   aw.busy = false; $("#awSend").innerHTML = icon("send"); $("#awSend").title = "보내기 (Enter)";
   if (!$("#askWin").hidden) $("#awInput").focus();
 }

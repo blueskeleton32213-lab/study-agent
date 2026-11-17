@@ -36,6 +36,7 @@ NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
 # 기능 이름 (usage.py의 KIND_NAMES와 같음)
 KINDS = {"chat": "질문하기", "ask": "질문 창", "quiz": "퀴즈 출제", "style": "시험 스타일 분석",
          "studio": "스튜디오", "grade": "서술형 채점", "digest": "요약본 만들기"}
+# websolve(인터넷 답 찾기)는 퀴즈 출제 모델을 그대로 써서 AI 설정에 따로 두지 않는다 (사용량 기록에만 이름이 있음)
 
 ENGINES = {
     "claude": {"name": "Claude", "cli": "Claude Code", "plans": {"pro": "Pro", "max": "Max", "api": "API 키"}},
@@ -380,14 +381,17 @@ class Run:
     """AI CLI 한 번 실행. proc을 바로 쓸 수 있고(멈추기), events()로 결과를 받는다."""
 
     def __init__(self, kind: str, prompt: str, session_id: str | None = None, schema: dict | None = None,
-                 bare: bool = False):
-        self.kind, self.schema, self.bare = kind, schema, bare
+                 bare: bool = False, web: bool = False):
+        # web: 인터넷 검색(WebSearch·WebFetch)을 이번 한 번만 켠다 — 사용자가 "몇 문제를 인터넷에서 찾을지" 고른 뒤에만
+        self.kind, self.schema, self.bare, self.web = kind, schema, bare, web
         s = load()
         self.engine = s["engine"]
         if session_engine(session_id) not in (None, self.engine):
             session_id = None  # 다른 엔진의 대화는 이어갈 수 없다 (호출한 쪽이 맥락을 붙여 새로 시작)
         self.session_id = session_id
-        self.choice = choice(kind, s)
+        self.choice = choice("quiz" if kind == "websolve" else kind, s)  # 인터넷 답 찾기는 퀴즈 출제 모델로
+        if web and self.engine != "claude":
+            raise RuntimeError("인터넷에서 답 찾기는 지금 Claude 엔진에서만 돼요. 'AI 설정'에서 Claude로 바꿔 주세요.")
         path = exe(self.engine)
         if not path:
             raise RuntimeError(f"{ENGINES[self.engine]['cli']}가 설치돼 있지 않아요. 'AI 설정'에서 설치 방법을 확인하세요.")
@@ -427,8 +431,10 @@ class Run:
 
     def _claude(self, path: str) -> list[str]:
         cmd = [path, "-p", "--strict-mcp-config", "--setting-sources", "project,local",
-               "--tools", "" if self.bare else CLAUDE_TOOLS,
+               "--tools", "" if self.bare else CLAUDE_TOOLS + (",WebSearch,WebFetch" if self.web else ""),
                "--output-format", "stream-json", "--verbose", "--include-partial-messages"]
+        if self.web:  # 인터넷 도구는 이 실행에서만 허락 (설정 파일의 허용 목록은 그대로)
+            cmd += ["--allowedTools", "WebSearch,WebFetch"]
         if self.choice["model"]:
             cmd += ["--model", self.choice["model"]]
         if self.schema:
@@ -629,8 +635,9 @@ class Run:
                        "modelUsage": {self.choice["model"] or "antigravity-default": {}}, "total_cost_usd": 0}
 
 
-def start(kind: str, prompt: str, session_id: str | None = None, schema: dict | None = None, bare: bool = False) -> Run:
-    return Run(kind, prompt, session_id, schema, bare)
+def start(kind: str, prompt: str, session_id: str | None = None, schema: dict | None = None, bare: bool = False,
+          web: bool = False) -> Run:
+    return Run(kind, prompt, session_id, schema, bare, web)
 
 
 def run_once(kind: str, prompt: str, schema: dict | None = None, timeout: float = 600) -> dict:
