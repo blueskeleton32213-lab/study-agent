@@ -421,6 +421,14 @@ main.studio #chat, main.studio .composer { display: none; }
 .st-sp { flex: 1; }
 #stTools { display: flex; gap: 6px; }
 .st-wrap { max-width: 760px; margin: 0 auto; }
+/* 정리 자료 안에서 찾기 (Ctrl+F) */
+#stFind { display: flex; align-items: center; gap: 0; height: 36px; padding: 0 2px 0 10px; border-radius: 8px; border: 1px solid var(--pen); box-shadow: 0 0 0 3px var(--pen-soft); background: var(--surface); min-width: 0; }
+#stFind[hidden] { display: none; }
+#stFindQ { width: 160px; min-width: 60px; flex: 0 1 auto; height: 30px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 14px; outline: 0; }
+#stFindN { min-width: 52px; text-align: right; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 4px; white-space: nowrap; }
+#stFind .icon-btn { width: 30px; height: 30px; }
+::highlight(st-find) { background: rgba(250, 204, 21, .35); color: inherit; }
+::highlight(st-find-cur) { background: #F59E0B; color: #111; }
 .st-h { font-size: 13px; font-weight: 600; color: var(--muted); margin: 8px 0 10px; }
 .tpl-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; margin-bottom: 34px; border-top: 1px solid var(--rule); }
 .tpl { display: grid; grid-template-columns: 36px 1fr; gap: 2px 12px; align-items: start; align-content: start; text-align: left; padding: 14px 6px 14px 2px; border-bottom: 1px solid var(--rule); }
@@ -742,6 +750,13 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
       <span class="st-top-title" id="stHead">스튜디오</span>
       <select id="stSubj" title="과목"></select>
       <span class="st-sp"></span>
+      <div id="stFind" hidden role="search">
+      <input id="stFindQ" type="text" placeholder="자료에서 찾기" aria-label="정리 자료에서 찾기" autocomplete="off" spellcheck="false">
+      <span id="stFindN"></span>
+      <button class="icon-btn" id="stFindPrev" title="이전 (Shift+Enter)"><span data-i="up"></span></button>
+      <button class="icon-btn" id="stFindNext" title="다음 (Enter)"><span data-i="down"></span></button>
+      <button class="icon-btn" id="stFindClose" title="닫기 (Esc)"><span data-i="close"></span></button>
+      </div>
       <span id="stTools"></span>
     </div>
     <div class="stage" id="stStage"></div>
@@ -968,6 +983,8 @@ const ICONS = {
   fitP: '<rect x="6.5" y="3.5" width="11" height="17" rx="1.5"/><path d="M9.5 8h5M9.5 11h5M9.5 14h3"/>',
   expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  up: '<path d="M6 15l6-6 6 6"/>',
+  down: '<path d="M6 9l6 6 6-6"/>',
   back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
   chevL: '<path d="M15 6l-6 6 6 6"/>',
   chevR: '<path d="M9 6l6 6-6 6"/>',
@@ -1980,6 +1997,7 @@ function openStudio() {
   loadStudio();
 }
 function closeStudio(cancel = false) {
+  closeFind();
   if (st?.view === "gen" && !st.err && !cancel) {  // 만드는 중에 다른 화면으로 가면 멈추지 않고 뒤에서 계속 만든다
     $("main").classList.remove("studio"); $("#studiov").hidden = true;
     return;
@@ -2052,6 +2070,8 @@ function renderStudio() {
     };
   }
   if (st.view !== "gen") stage.scrollTop = 0;
+  if (st.view !== "doc") closeFind();
+  else if (!$("#stFind").hidden) runFind();  // 다시 그린 본문(불러오기 끝남)에서 다시 찾기
 }
 async function openDoc(d) {
   st.view = "doc"; st.doc = { ...d, markdown: "" }; renderStudio();
@@ -2111,8 +2131,66 @@ async function generateStudio(kind, scope, custom) {
 }
 document.addEventListener("keydown", e => {
   if (!studioShown() || e.isComposing || document.querySelector("dialog[open]")) return;
-  if (e.key === "Escape") { e.preventDefault(); $("#stExit").click(); }
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "f" && st.view === "doc") { e.preventDefault(); return openFind(); }
+  if (e.key === "Escape") { e.preventDefault(); if (!$("#stFind").hidden) return closeFind(); $("#stExit").click(); }
 });
+
+/* 정리 자료 안에서 찾기: 앱 창(pywebview)은 브라우저 Ctrl+F가 꺼져 있어 직접 만든다.
+   DOM은 건드리지 않고 CSS Highlight API로 칠한다 (KaTeX·mermaid가 깨지지 않게) */
+const fd = { ranges: [], i: -1 };
+const HL = typeof Highlight === "function" && CSS.highlights;
+function openFind() {
+  $("#stFind").hidden = false;
+  const q = $("#stFindQ"); q.focus(); q.select();
+  if (q.value) runFind();
+}
+function closeFind() {
+  $("#stFind").hidden = true; clearFind();
+}
+function clearFind() {
+  fd.ranges = []; fd.i = -1; $("#stFindN").textContent = "";
+  if (HL) { CSS.highlights.delete("st-find"); CSS.highlights.delete("st-find-cur"); }
+}
+function runFind(keepPos = false) {
+  const q = $("#stFindQ").value.trim().toLowerCase(), doc = $("#stDoc");
+  const prev = fd.i; clearFind();
+  if (!q || !doc) return;
+  // 글자 노드를 이어 붙여 찾는다 (**굵게** 처럼 노드가 갈려도 찾게)
+  const nodes = [], walker = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT, {
+    acceptNode: n => n.parentElement.closest(".katex-mathml, svg, script, style") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  let text = "";
+  for (let n; (n = walker.nextNode());) { nodes.push({ n, at: text.length }); text += n.data; }
+  const hay = text.toLowerCase();
+  const locate = pos => {  // 이어 붙인 위치 → (노드, 노드 안 위치)
+    let lo = 0, hi = nodes.length - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (nodes[m].at <= pos) lo = m; else hi = m - 1; }
+    return [nodes[lo].n, pos - nodes[lo].at];
+  };
+  for (let p = hay.indexOf(q); p >= 0 && fd.ranges.length < 2000; p = hay.indexOf(q, p + q.length)) {
+    const r = new Range(), [sn, so] = locate(p), [en, eo] = locate(p + q.length - 1);
+    r.setStart(sn, so); r.setEnd(en, eo + 1); fd.ranges.push(r);
+  }
+  if (!fd.ranges.length) { $("#stFindN").textContent = "없음"; return; }
+  if (HL) CSS.highlights.set("st-find", new Highlight(...fd.ranges));
+  stepFind(0, keepPos && prev >= 0 ? Math.min(prev, fd.ranges.length - 1) : 0);
+}
+function stepFind(d, to) {
+  const n = fd.ranges.length; if (!n) return;
+  fd.i = to ?? (fd.i + d + n) % n;
+  const r = fd.ranges[fd.i];
+  if (HL) CSS.highlights.set("st-find-cur", new Highlight(r));
+  $("#stFindN").textContent = `${fd.i + 1}/${n}`;
+  const stage = $("#stStage"), box = r.getBoundingClientRect(), sb = stage.getBoundingClientRect();
+  if (box.top < sb.top + 60 || box.bottom > sb.bottom - 20) stage.scrollTop += box.top - sb.top - sb.height / 3;
+}
+let findT = null;
+$("#stFindQ").addEventListener("input", () => { clearTimeout(findT); findT = setTimeout(runFind, 120); });
+$("#stFindQ").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); clearTimeout(findT); if (fd.ranges.length) stepFind(e.shiftKey ? -1 : 1); else runFind(); }
+});
+$("#stFindPrev").onclick = () => { stepFind(-1); $("#stFindQ").focus(); };
+$("#stFindNext").onclick = () => { stepFind(1); $("#stFindQ").focus(); };
+$("#stFindClose").onclick = closeFind;
 
 /* ── 대화 기록: 대화마다 서버(data/chats)에 저장, 다시 열어 이어가기·삭제 ── */
 let chatId = store.get("chatId", null);
