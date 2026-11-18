@@ -331,6 +331,8 @@ def set_onedrive(on: bool) -> dict:
     with onedrive_lock, srs_lock:  # 맞추는 동안 복습 카드를 쓰지 않게
         code = onedrive_sync.main()
     msg = onedrive_sync.last_message
+    if onedrive_sync.client_note and onedrive_sync.client_note != msg:
+        msg = f"{onedrive_sync.client_note}. {msg}"
     if code:
         msg += " (일부 파일은 다음 동기화 때 다시 시도해요)"
     return {"ok": True, "onedrive": True, "message": msg}

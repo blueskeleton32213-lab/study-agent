@@ -13,7 +13,8 @@
 - OneDrive에 "학습 튜터 자료" 폴더가 없으면(처음 쓰는 사람) 로컬 폴더만 만들고 넘어간다.
   그 폴더를 OneDrive에 만들어 두면 다음 동기화 때 이 컴퓨터 자료가 전부 올라간다.
 - 동기화 켜기/끄기는 컴퓨터마다 따로 (local/sync_settings.json, 앱 사이드바의 「OneDrive 동기화」).
-  꺼져 있으면 아무것도 주고받지 않는다. 아직 고른 적이 없으면 OneDrive 폴더가 있을 때 켜진 것으로 본다.
+  꺼져 있으면 아무것도 주고받지 않는다.
+  켜져 있으면 컴퓨터의 OneDrive 프로그램이 꺼져 있을 때 같이 켠다 (그래야 클라우드와 실제로 주고받음). 아직 고른 적이 없으면 OneDrive 폴더가 있을 때 켜진 것으로 본다.
     python tools/onedrive_sync.py on | off | status
 """
 from __future__ import annotations
@@ -38,6 +39,7 @@ TMP_PREFIX = ".~sync-"
 
 Stat = tuple[int, int]  # (크기, 수정 시각 초)
 last_message = ""  # 마지막 로그 한 줄 (앱이 결과를 보여 줄 때 쓴다)
+client_note = ""  # 이번에 OneDrive 프로그램을 켰거나 못 켰을 때 한 줄 (앱 토스트 앞에 붙인다)
 
 
 _received_cache: tuple[float, dict[str, Stat]] = (-1.0, {})
@@ -68,6 +70,51 @@ def enabled() -> bool:
 def set_enabled(on: bool) -> None:
     SETTINGS.parent.mkdir(parents=True, exist_ok=True)
     SETTINGS.write_text(json.dumps({"enabled": bool(on)}), encoding="utf-8")
+
+
+def client_exe() -> Path | None:
+    """이 컴퓨터에 설치된 OneDrive 프로그램 (사용자 설치 → 전체 설치 순)."""
+    for base in (os.environ.get("LOCALAPPDATA"), os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)")):
+        if not base:
+            continue
+        for sub in (r"Microsoft\OneDrive\OneDrive.exe", r"Microsoft OneDrive\OneDrive.exe"):
+            p = Path(base) / sub
+            if p.is_file():
+                return p
+    return None
+
+
+def client_running() -> bool:
+    import subprocess
+    try:
+        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq OneDrive.exe", "/NH"], capture_output=True,
+                             text=True, timeout=10, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+        return "onedrive.exe" in out.lower()
+    except Exception:
+        return True  # 확인을 못 하면 괜히 또 띄우지 않는다
+
+
+def ensure_client(log) -> None:
+    """동기화가 켜져 있으면 컴퓨터의 OneDrive 프로그램도 켜 둔다.
+    이 스크립트는 'OneDrive 폴더'와 맞출 뿐이라, 프로그램이 꺼져 있으면 클라우드(다른 컴퓨터)와 실제로 주고받지 않는다."""
+    global client_note
+    client_note = ""
+    if sys.platform != "win32" or client_running():
+        return
+    exe = client_exe()
+    if not exe:
+        client_note = "이 컴퓨터에 OneDrive 프로그램이 없어서 켜지 못했어요 (OneDrive 폴더와만 맞춰요)"
+        log(client_note)
+        return
+    import subprocess
+    try:
+        subprocess.Popen([str(exe), "/background"], close_fds=True,
+                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+        client_note = "꺼져 있던 OneDrive 프로그램을 켰어요"
+        log(client_note)
+    except OSError as exc:
+        client_note = f"OneDrive 프로그램을 켜지 못했어요: {exc}"
+        log(client_note)
 
 
 def skip_file(name: str) -> bool:
@@ -266,6 +313,8 @@ def main() -> int:
             out.reconfigure(encoding="utf-8")
         except Exception:
             pass
+    if enabled():
+        ensure_client(log)  # 스위치를 켤 때·앱을 켜고 끌 때마다: 컴퓨터의 OneDrive 프로그램도 켜져 있게
     if not REMOTE.is_dir():
         # 처음 쓰는 사람·OneDrive를 안 쓰는 컴퓨터: 이 컴퓨터에만 저장하고 그대로 쓴다.
         # 나중에 OneDrive에 '학습 튜터 자료' 폴더를 만들면 다음 동기화부터 거기로 올라간다.
