@@ -1673,7 +1673,20 @@ function fileList(s) {
   return wrap;
 }
 const markOpenFile = () => document.querySelectorAll(".file[data-f]").forEach(b => b.classList.toggle("on", vw?.info?.name === b.dataset.f));
-function setSubject(name) { current = name; store.set("subject", current); renderSide(); }
+function setSubject(name) { current = name; store.set("subject", current); renderSide(); followSubject(); }
+// 왼쪽에서 과목을 고르면 열려 있는 화면(스튜디오·복습·대화 기록·퀴즈 기록)도 그 과목으로. 질문하기는 원래 current를 쓴다
+function followSubject() {
+  if (!current) return;
+  if (st) {
+    if (st.view === "gen") { if (studioShown()) toast("만드는 중에는 스튜디오 과목을 바꿀 수 없어요"); }
+    else if (st.subject !== current && state.subjects.some(s => s.name === current && s.files.length)) {
+      st.subject = current; $("#stSubj").value = current; st.view = "home"; loadStudio();
+    }
+  }
+  if (hv) { hv.subj = current; renderChats(); }
+  if (rl && !rv) { rl.subj = current; showReviewList(); }  // 오늘 복습할 카드 수도 이 과목으로 다시 센다
+  if (ql) { ql.subj = current; renderQuizList(); }
+}
 let dragSubj = null;
 // 과목 moving을 target 앞(before) 또는 뒤로 옮기고, 순서를 서버에 저장
 async function moveSubject(moving, target, before) {
@@ -2489,7 +2502,7 @@ async function openHistory() {
   if (qz || ql) closeQuiz();
   if (st) closeStudio();
   if (rv || quizShown() || studioShown()) return;
-  hv = { chats: [], q: "", subj: "", kind: hvKind };  // subj: "" = 전체, null = 과목 없음 / kind: chats(질문하기) · asks(질문 창)
+  hv = { chats: [], q: "", subj: current ?? "", kind: hvKind };  // subj: "" = 전체, null = 과목 없음 / kind: chats(질문하기) · asks(질문 창)
   $("#hvKind").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.k === hv.kind));
   $("#hvSearch").value = "";
   $("main").classList.add("histing"); $("#historyv").hidden = false;
@@ -2502,7 +2515,7 @@ function closeHistory() { hv = null; $("main").classList.remove("histing"); $("#
 let hvKind = "chats";  // 마지막으로 본 탭 (다시 열 때 그대로)
 $("#hvKind").querySelectorAll("button").forEach(b => b.onclick = () => {
   if (!hv || hv.kind === b.dataset.k) return;
-  hv.kind = hvKind = b.dataset.k; hv.subj = "";
+  hv.kind = hvKind = b.dataset.k; hv.subj = current ?? "";
   $("#hvKind").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
   loadChats();
 });
@@ -2715,7 +2728,7 @@ function exitQuiz() { showQuizList(); }  // 푼 곳까지 기록돼 있어서 �
 /* 퀴즈 기록 목록: 만든 퀴즈가 대화 기록처럼 남고, 눌러서 이어 풀거나 결과·해설을 다시 본다 */
 async function showQuizList() {
   if (qz && qz.phase !== "gen") { saveQuiz(); qz = null; }  // 만드는 중인 퀴즈는 뒤에서 계속
-  ql = ql || { list: null, subj: "" };
+  ql = ql || { list: null, subj: current ?? "" };
   showQuizView(); setQuizTop(true);
   $("#qzActions").innerHTML = ""; $("#qzActions").hidden = true;
   if (!ql.list) $("#qzStage").innerHTML = '<div class="st-wrap"><div class="typing">불러오는 중</div></div>';
@@ -3135,7 +3148,7 @@ function saveReview(me = rv) {
 
 async function showReviewList() {
   rv = null;
-  rl = rl || { list: null, subj: "", due: null };
+  rl = rl || { list: null, subj: current ?? "", due: null };
   rl.rec = null; rl.peek = null;
   showReviewView(); setReviewTop(true);
   $("#rvActions").innerHTML = ""; $("#rvActions").hidden = true;
