@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -570,9 +571,18 @@ def exam_files(subject: str) -> list[Path]:
                   if f.suffix.lower() in ALLOWED_EXT and EXAM_RE.search(unicodedata.normalize("NFC", f.stem)))
 
 
+def read_picks(subject: str) -> str:
+    """사용자가 적은 '시험에 나오는 문제' 목록 (교수님이 찝어준 문제)"""
+    p = STYLES / f"{subject}.picks.txt"
+    return p.read_text(encoding="utf-8").strip() if p.exists() else ""
+
+
 def style_info(subject: str) -> dict:
     files = exam_files(subject)
     sig = {f.name: int(f.stat().st_mtime) for f in files}
+    picks = read_picks(subject)
+    if picks:  # 찝어준 문제 목록이 바뀌어도 다시 분석해야 한다
+        sig["#picks"] = hashlib.sha1(picks.encode("utf-8")).hexdigest()[:12]
     path = STYLES / f"{subject}.json"
     rec = None
     if path.exists():
@@ -582,15 +592,27 @@ def style_info(subject: str) -> dict:
             rec = None
     note_path = STYLES / f"{subject}.note.txt"  # 사용자가 직접 적은 교수님 출제 스타일 (분석과 별도로 보관)
     note = note_path.read_text(encoding="utf-8").strip() if note_path.exists() else ""
+    analyzable = bool(files) or bool(picks)  # 시험 자료가 없어도 찝어준 문제가 있으면 분석한다
     return {"subject": subject, "files": [f.name for f in files], "has_exam": bool(files), "note": note,
+            "picks": picks, "analyzable": analyzable,
             "analyzed": rec.get("created") if rec else None, "guide": rec.get("guide") if rec else None,
             "pool": (rec.get("pool") or []) if rec else [],
-            # 시험 자료가 추가·수정·삭제되면 다시 분석해야 한다
-            "stale": bool(files) and (not rec or rec.get("files") != sig), "sig": sig}
+            # 시험 자료가 추가·수정·삭제되거나 찝어준 문제가 바뀌면 다시 분석해야 한다
+            "stale": analyzable and (not rec or rec.get("files") != sig), "sig": sig}
 
 
-def style_prompt(subject: str, files: list[str], note: str = "") -> str:
+def style_prompt(subject: str, files: list[str], note: str = "", picks: str = "") -> str:
     names = "\n".join(f"- {n} → texts/{subject}/{Path(n).with_suffix('.md').name}" for n in files) or "- (파일명으로 찾은 시험·문제 파일 없음)"
+    picks_block = f"""
+
+## ★ 교수님이 찝어준 문제 (학생이 적은 것 — 이 분석의 중심)
+{picks}
+이 과목은 이 문제들(또는 그 변형)만 시험에 나온다. 그래서 아래 순서를 바꿔서 한다:
+1. 목록의 문제를 **하나씩 모두** 원본에서 찾는다. "3강 연습문제 5"처럼 위치가 있으면 `cache/목차/{subject}.md`로 파일·쪽을 고르고 Grep으로 문항 번호를 찾아 그 문제와 풀이·해설만 읽는다. 표기가 애매하면 가장 그럴듯한 것을 고르고 why에 "추정: …"이라고 적는다. 못 찾으면 pool에 넣되 page는 "못 찾음", why에 이유를 적는다.
+2. 이 문제들은 모두 picked=true, why="교수님 지정" (+ 해설이 있으면 짝).
+3. guide는 **찝어준 문제를 기준으로** 쓴다: 1번은 "지정 문제만 출제"로 적고 문항 수, 5번은 지정 문제마다 어떻게 변형될 수 있는지(숫자·조건·소문항), 6번은 지정 문제들이 다루는 주제·필요한 공식·함정. 지정 문제를 풀려면 알아야 하는 강의 개념과 그 위치도 6번에 적는다.
+4. 그 밖의 문제는 1단계 B를 줄여서, 지정 문제와 같은 주제의 예제·연습문제만 최대 10개 pool에 넣는다 (picked=false, 변형 연습용).
+5. 시험 파일(A)은 문장 형식·배점·구조(2~4, 7번)를 파악하는 데만 쓴다.""" if picks else ""
     return f"""[시험 스타일 분석 — 결과는 JSON(guide, pool)으로만]
 과목: {subject}
 이 과목 교수님은 문제를 세 가지 방식으로 낼 수 있다: ① 문제를 파일로 따로 준다 ② 개념 설명 사이에 예제·연습문제를 넣는다 ③ 연습문제 중 몇 개만 골라 시험에 낸다.
@@ -600,7 +622,7 @@ def style_prompt(subject: str, files: list[str], note: str = "") -> str:
 - 시험·문제 파일 (파일명으로 찾음, **모두** 읽는다):
 {names}
 - 강의 파일 목록: cache/목차/{subject}.md
-- 교수님 출제 메모 (학생이 적은 것, 가장 우선): {note or "없음"}
+- 교수님 출제 메모 (학생이 적은 것, 가장 우선): {note or "없음"}{picks_block}
 
 ## 1단계: 문제 찾기 (토큰 절약 — 강의 원문을 통째로 읽지 않는다)
 A. 따로 준 문제: 위 시험·문제 파일을 읽는다. 해설·정답·solution 파일이 있으면 어느 문제의 답인지 짝짓는다.
@@ -644,9 +666,10 @@ def pool_text(pool: list) -> str:
                      + (f" | {p.get('why')}" if p.get("picked") and p.get("why") else "") for p in rows)
 
 
-def save_note(subject: str, note: str) -> None:
+def save_note(subject: str, note: str, kind: str = "note") -> None:
+    """kind: note(교수님 출제 스타일 메모) / picks(찝어준 문제 목록)"""
     STYLES.mkdir(parents=True, exist_ok=True)
-    p = STYLES / f"{subject}.note.txt"
+    p = STYLES / f"{subject}.{kind}.txt"
     note = (note or "").strip()[:4000]
     if note:
         p.write_text(note, encoding="utf-8")
@@ -655,15 +678,23 @@ def save_note(subject: str, note: str) -> None:
 
 
 def quiz_prompt(subject: str, scope: str, n: int, level: str, qtype: str, guide: str | None = None,
-                note: str = "", pool: list | None = None) -> str:
+                note: str = "", pool: list | None = None, picks: str = "") -> str:
     style_block = ""
+    if picks:
+        style_block += f"""
+
+## 교수님이 찝어준 문제 (이 문제들만 시험에 나온다)
+{picks}"""
     if pool:
+        rest = ("- 이 과목은 찝어준 문제만 시험에 나온다. **범위 안의 ★ 문제의 변형으로만** 출제한다. 문제 수가 ★보다 많으면 ★ 문제를 다른 숫자·조건·소문항으로 한 번 더 변형하거나, ★ 문제를 풀 때 쓰는 개념을 묻는다. ★과 관계없는 주제로 새로 내지 않는다.\n"
+                "- 범위 안에 ★ 문제가 없으면 범위 전체의 ★ 문제에서 낸다.") if picks else \
+            "- 남은 문제 수는 아래 스타일대로 강의자료에서 새로 낸다."
         style_block += f"""
 
 ## 문제 지도 (★ = 시험에 뽑힌 문제. 형식: 이름 | 위치 | 종류 | 주제 | 답 유무)
 {pool_text(pool)}
 - 범위 안에 ★ 문제가 있으면 그 문제들을 **먼저** 출제한다. 원문 그대로가 아니라 숫자·조건을 바꾼 변형으로 내고, 문제 끝에 "(연습문제 5 변형)"처럼 원래 문제를 밝힌다. 원래 문제는 위치를 보고 그 쪽만 읽는다.
-- 남은 문제 수는 아래 스타일대로 강의자료에서 새로 낸다."""
+{rest}"""
     if guide or note:
         qtype_text = "이 과목 시험 스타일의 유형 비율대로" if qtype == "mix" else QTYPES.get(qtype, QTYPES["mix"])
         parts = []
@@ -819,11 +850,35 @@ STUDIO_TYPES = {
 }
 
 
+def patterns_base(subject: str) -> str:
+    """기출 유형 분석이 퀴즈 탭의 시험 스타일 분석(data/styles)과 찝어준 문제를 바탕으로 하게 한다"""
+    info = style_info(subject)
+    parts = []
+    if info["picks"]:
+        parts.append(f"""### 교수님이 찝어준 문제 (학생이 적은 것 — 이 과목은 이 문제들만 시험에 나온다)
+{info["picks"]}
+- 문서 전체를 이 문제들 중심으로 쓴다. `## 유형별 정리` 앞에 `## 찝어준 문제` 표를 둔다: `| 문제 | 위치 | 주제 | 풀 때 필요한 개념·공식 | 예상 변형 | 출처 |` (지정 문제 전부, 원본에서 문제와 풀이를 직접 읽고 쓴다).
+- `## 대비 전략`도 지정 문제별로 쓴다. 지정 문제와 관계없는 유형은 짧게만.""")
+    if info["guide"] and not info["stale"]:
+        parts.append(f"""### 이미 분석된 시험 스타일 ({info["analyzed"]}, 퀴즈 탭에서 분석한 것)
+{info["guide"]}
+
+### 문제 지도 (★ = 시험에 뽑힌 문제)
+{pool_text(info["pool"])}
+- 위 분석을 **바탕으로** 문서를 만든다. 파일을 처음부터 다시 훑지 말고, 문제 지도의 위치로 필요한 쪽만 원본에서 읽어 확인한다. 출처는 문제 지도의 원본 파일명·쪽으로 단다 (분석 내용 자체를 출처로 쓰지 않는다).
+- 원본과 분석이 다르면 원본을 따른다.""")
+    elif info["analyzable"]:
+        parts.append("### 시험 스타일 분석\n아직 퀴즈 탭의 시험 스타일 분석이 없거나 자료가 바뀌어 오래됐다. 위 근거 자료와 찝어준 문제로 직접 분석한다.")
+    return ("\n\n## 바탕 자료\n" + "\n\n".join(parts)) if parts else ""
+
+
 def studio_prompt(subject: str, kind: str, scope: str, custom: str) -> str:
     if kind == "custom":
         task = f"아래 요청대로 정리 자료를 만든다.\n요청: {custom}"
     else:
         task = STUDIO_TYPES[kind][1]
+    if kind == "patterns":
+        task += patterns_base(subject)
     return f"""[스튜디오 — 정리 자료 만들기, 결과는 JSON(title, markdown)으로만]
 과목: {subject} / 범위: {scope or "전체"}
 
@@ -1237,7 +1292,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True})
             if url.path == "/api/style/note":  # 교수님 출제 스타일 메모 저장 (빈 글이면 삭제)
                 data = json.loads(self._body())
-                save_note(safe_name(data["subject"]), data.get("note", ""))
+                for kind in ("note", "picks"):  # 보낸 것만 저장 (picks = 찝어준 문제 목록)
+                    if kind in data:
+                        save_note(safe_name(data["subject"]), data.get(kind) or "", kind)
                 return self._json({"ok": True})
             if url.path == "/api/style/reset":  # 다음 시험 스타일 퀴즈 때 다시 분석
                 p = STYLES / f"{safe_name(json.loads(self._body())['subject'])}.json"
@@ -1397,17 +1454,18 @@ class Handler(BaseHTTPRequestHandler):
             if ev["type"] not in ("text", "done", "session"):
                 send(ev)
         try:
-            guide, note, pool = None, "", []
+            guide, note, pool, picks = None, "", [], ""
             if data.get("style", "exam") == "exam":
                 info = style_info(subject)
-                note = info["note"]
-                guide = info["guide"] if info["has_exam"] else None  # 시험 자료를 지웠으면 예전 분석은 쓰지 않는다
-                pool = info["pool"] if info["has_exam"] else []
-                if info["has_exam"] and (info["stale"] or not guide):
-                    # 처음이거나 시험 자료가 바뀌었으면 스타일부터 분석해서 저장 (강의 속 예제·연습문제도 찾아 문제 지도로)
-                    send({"type": "tool", "label": f"시험 스타일·문제 지도 분석 중 (시험·문제 파일 {len(info['files'])}개 + 강의 속 예제, 처음 한 번)"})
+                note, picks = info["note"], info["picks"]
+                guide = info["guide"] if info["analyzable"] else None  # 시험 자료를 지웠으면 예전 분석은 쓰지 않는다
+                pool = info["pool"] if info["analyzable"] else []
+                if info["analyzable"] and (info["stale"] or not guide):
+                    # 처음이거나 시험 자료·찝어준 문제가 바뀌었으면 스타일부터 분석해서 저장 (강의 속 예제·연습문제도 찾아 문제 지도로)
+                    what = f"시험·문제 파일 {len(info['files'])}개" + (" + 찝어준 문제" if picks else " + 강의 속 예제")
+                    send({"type": "tool", "label": f"시험 스타일·문제 지도 분석 중 ({what}, 처음 한 번)"})
                     sres = {}
-                    stream_claude(style_prompt(subject, info["files"], note), None, forward,
+                    stream_claude(style_prompt(subject, info["files"], note, picks), None, forward,
                                   STYLE_SCHEMA, on_result=sres.update, slot="quiz", kind="style")
                     so = sres.get("structured_output") or {}
                     if so.get("guide"):
@@ -1417,7 +1475,7 @@ class Handler(BaseHTTPRequestHandler):
                         send({"type": "tool", "label": f"시험 스타일 저장함 (문제 지도 {len(pool)}개, 시험에 뽑힌 문제 {picked}개) → 문제 만드는 중"})
                 send({"type": "style", "used": bool(guide or note), "files": len(info["files"]), "note": bool(note)})
             prompt = quiz_prompt(subject, (data.get("scope") or "").strip(), n, data.get("level", "보통"),
-                                 data.get("qtype", "mix"), guide, note, pool)
+                                 data.get("qtype", "mix"), guide, note, pool, picks)
             stream_claude(prompt, None, forward, QUIZ_SCHEMA, on_result=result.update, slot="quiz")
             qs = clean_questions((result.get("structured_output") or {}).get("questions") or [])
             if qs:

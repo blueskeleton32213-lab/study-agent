@@ -516,8 +516,8 @@ dialog::backdrop { background: rgba(16, 20, 30, .4); }
 dialog.wide { width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow-y: auto; }
 #guideDlg { width: min(680px, calc(100vw - 32px)); }
 .guide-body { max-height: 60vh; overflow-y: auto; font-size: 14px; padding: 4px 2px; }
-#qNote { width: 100%; height: auto; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rule-strong); background: var(--sunk); color: var(--ink); font: inherit; font-size: 14px; resize: vertical; line-height: 1.6; }
-#qNote:focus { outline: 0; border-color: var(--pen); box-shadow: 0 0 0 3px var(--pen-soft); }
+#qNote, #qPicks { width: 100%; height: auto; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rule-strong); background: var(--sunk); color: var(--ink); font: inherit; font-size: 14px; resize: vertical; line-height: 1.6; }
+#qNote:focus, #qPicks:focus { outline: 0; border-color: var(--pen); box-shadow: 0 0 0 3px var(--pen-soft); }
 .style-info { margin: 8px 0 0; }
 .style-info a { color: var(--pen); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; margin-left: 6px; }
 .style-info b { color: var(--ink); font-weight: 600; }
@@ -992,6 +992,8 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
     <p class="desc style-info" id="qStyleInfo"></p>
     <label for="qNote" id="qNoteLabel">교수님 출제 스타일 <span class="opt">(선택)</span></label>
     <textarea id="qNote" rows="3" placeholder="예: 중간고사는 서술형 5문제, 문제마다 (20점). 계산 과정을 꼭 써야 하고, 강의 예제에서 숫자만 바꿔서 냄."></textarea>
+    <label for="qPicks">시험에 나오는 문제 <span class="opt">(선택, 교수님이 찝어준 문제. 적으면 이 문제들 위주로 분석·출제. 줄바꿈은 Shift+Enter)</span></label>
+    <textarea id="qPicks" rows="3" placeholder="한 줄에 하나씩. 예:&#10;3강.pdf 연습문제 2, 5번&#10;Chapter4 예제 4.3&#10;과제2 3번"></textarea>
     <div class="dlg-btns">
       <button class="btn" value="cancel">취소</button>
       <button class="btn primary" value="ok" id="qOk">문제 만들기<kbd>Enter</kbd></button>
@@ -2235,10 +2237,13 @@ document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
 });
 $("#quizDlg").addEventListener("close", async () => {
   if ($("#quizDlg").returnValue !== "ok") return;
-  const note = $("#qNote").value.trim();
-  if (qStyle && note !== qStyle.noteOrig.trim()) {  // 교수님 스타일 메모가 바뀌었으면 과목별로 저장
-    try { await api("/api/style/note", { method: "POST", body: JSON.stringify({ subject: $("#qSubj").value, note }) }); }
-    catch (e) { toast("교수님 스타일을 저장하지 못했어요: " + e.message); }
+  const note = $("#qNote").value.trim(), picks = $("#qPicks").value.trim();
+  const changed = {};  // 교수님 스타일 메모·찝어준 문제가 바뀌었으면 과목별로 저장
+  if (qStyle && note !== qStyle.noteOrig.trim()) changed.note = note;
+  if (qStyle && picks !== qStyle.picksOrig.trim()) changed.picks = picks;
+  if (Object.keys(changed).length) {
+    try { await api("/api/style/note", { method: "POST", body: JSON.stringify({ subject: $("#qSubj").value, ...changed }) }); }
+    catch (e) { toast("교수님 스타일·찝어준 문제를 저장하지 못했어요: " + e.message); }
   }
   startQuiz({
     style: $("#qStyle .on").dataset.v,
@@ -2656,15 +2661,16 @@ function openQuizDialog() {
   $("#qRange").value = ""; $("#quizDlg").returnValue = ""; $("#quizDlg").showModal();
   loadQuizStyle(sel.value);
 }
-let qStyle = null; // { info, noteOrig }
+let qStyle = null; // { info, noteOrig, picksOrig }
 async function loadQuizStyle(subject) {
   qStyle = null;
-  $("#qStyleInfo").textContent = "시험 자료를 확인하는 중…"; $("#qNote").value = "";
-  try { const info = await (await api(`/api/style?subject=${encodeURIComponent(subject)}`)).json(); qStyle = { info, noteOrig: info.note || "" }; }
+  $("#qStyleInfo").textContent = "시험 자료를 확인하는 중…"; $("#qNote").value = ""; $("#qPicks").value = "";
+  try { const info = await (await api(`/api/style?subject=${encodeURIComponent(subject)}`)).json(); qStyle = { info, noteOrig: info.note || "", picksOrig: info.picks || "" }; }
   catch (e) { $("#qStyleInfo").textContent = e.message; return; }
   $("#qNote").value = qStyle.info.note || "";
-  // 시험 자료가 있으면 시험 스타일을 기본으로, 없으면 메모가 있을 때만
-  setQuizStyle(qStyle.info.has_exam || qStyle.info.note ? "exam" : "plain");
+  $("#qPicks").value = qStyle.info.picks || "";
+  // 시험 자료·찝어준 문제가 있으면 시험 스타일을 기본으로, 없으면 메모가 있을 때만
+  setQuizStyle(qStyle.info.has_exam || qStyle.info.picks || qStyle.info.note ? "exam" : "plain");
 }
 function setQuizStyle(v) {
   document.querySelectorAll("#qStyle button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
@@ -2672,22 +2678,29 @@ function setQuizStyle(v) {
 }
 function updateQuizStyleInfo() {
   if (!qStyle) return;
-  const i = qStyle.info, note = $("#qNote").value.trim(), v = $("#qStyle .on").dataset.v;
-  const examOk = i.has_exam || !!note;
+  const i = qStyle.info, note = $("#qNote").value.trim(), picks = $("#qPicks").value.trim(), v = $("#qStyle .on").dataset.v;
+  const analyzable = i.has_exam || !!picks;
+  const examOk = analyzable || !!note;
   $("#qStyle [data-v=exam]").disabled = !examOk;
   if (!examOk && v === "exam") return setQuizStyle("plain");
   const files = i.files.slice(0, 2).join(", ") + (i.files.length > 2 ? ` 외 ${i.files.length - 2}개` : "");
+  const what = [i.has_exam ? `시험 자료 <b>${i.files.length}개</b>` : "", picks ? "<b>찝어준 문제</b>" : ""].filter(Boolean).join(" + ");
+  const fresh = i.guide && !i.stale && picks === qStyle.picksOrig.trim();  // 찝어준 문제를 고치면 다시 분석
   let html;
   if (v === "plain") html = "강의자료 내용으로 일반 퀴즈를 내요.";
-  else if (i.has_exam && i.guide && !i.stale) html = `시험 자료 <b>${i.files.length}개</b>를 분석한 스타일로 내요 (${esc(i.analyzed)} 분석)${note ? ", 아래 메모를 가장 우선해요" : ""}.<a id="qGuide">분석 내용 보기</a><a id="qReanalyze">다시 분석</a>`;
-  else if (i.has_exam) html = `시험 자료 <b>${i.files.length}개</b>(${esc(files)})를 ${i.guide ? "바뀐 내용으로 다시" : "처음 한 번"} 분석하고 출제해요. 1분쯤 더 걸려요.`;
+  else if (analyzable && fresh) html = `${what}를 분석한 스타일로 내요 (${esc(i.analyzed)} 분석)${picks ? ", 찝어준 문제의 변형 위주로" : ""}${note ? ", 아래 메모를 가장 우선해요" : ""}.<a id="qGuide">분석 내용 보기</a><a id="qReanalyze">다시 분석</a>`;
+  else if (analyzable) html = `${what}${i.has_exam && !picks ? `(${esc(files)})` : ""}를 ${i.guide ? "바뀐 내용으로 다시" : "처음 한 번"} 분석하고 출제해요. 1분쯤 더 걸려요.`
+    + (i.guide ? `<a id="qGuide">예전 분석 보기</a>` : "");  // 오래된 분석도 열어볼 수 있게
   else html = "이 과목엔 시험·기출 자료가 없어서 아래에 적은 교수님 스타일대로 내요.";
   $("#qStyleInfo").innerHTML = html;
   $("#qNoteLabel").innerHTML = i.has_exam ? '교수님 출제 스타일 <span class="opt">(선택, 시험 자료 분석보다 우선)</span>'
     : '교수님 출제 스타일 <span class="opt">(이 과목엔 시험 자료가 없어서 여기 적은 내용이 기준이 돼요)</span>';
   const g = $("#qGuide"); if (g) g.onclick = () => {
-    $("#guideTitle").textContent = `${i.subject} 시험 스타일`;
-    $("#guideMeta").textContent = `시험 자료 ${i.files.length}개를 ${i.analyzed}에 분석한 내용이에요. 시험 자료가 바뀌면 자동으로 다시 분석해요.`;
+    const old = !fresh;
+    $("#guideTitle").textContent = `${i.subject} 시험 스타일${old ? " (예전 분석)" : ""}`;
+    $("#guideMeta").textContent = old
+      ? `${i.analyzed}에 분석한 예전 내용이에요. 그 뒤로 시험 자료나 찝어준 문제가 바뀌어서, 다음 시험 스타일 퀴즈를 만들 때 다시 분석해요.`
+      : `시험 자료 ${i.files.length}개${i.picks ? "와 찝어준 문제" : ""}를 ${i.analyzed}에 분석한 내용이에요. 시험 자료나 찝어준 문제가 바뀌면 자동으로 다시 분석해요.`;
     $("#guideBody").innerHTML = md(i.guide); $("#guideDlg").showModal();
   };
   const r = $("#qReanalyze"); if (r) r.onclick = async () => {
@@ -2697,7 +2710,7 @@ function updateQuizStyleInfo() {
 }
 $("#qSubj").onchange = e => loadQuizStyle(e.target.value);
 $("#qStyle").onclick = e => { const b = e.target.closest("button"); if (b && !b.disabled) setQuizStyle(b.dataset.v); };
-$("#qNote").oninput = updateQuizStyleInfo;
+$("#qNote").oninput = $("#qPicks").oninput = updateQuizStyleInfo;
 function showQuizView() {
   if (rv || rl) closeReview();
   if (st) closeStudio();
