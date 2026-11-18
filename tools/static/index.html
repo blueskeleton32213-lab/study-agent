@@ -795,8 +795,8 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
       <div id="stFind" hidden role="search">
       <input id="stFindQ" type="text" placeholder="자료에서 찾기" aria-label="정리 자료에서 찾기" autocomplete="off" spellcheck="false">
       <span id="stFindN"></span>
-      <button class="icon-btn" id="stFindPrev" title="이전 (Shift+Enter)"><span data-i="up"></span></button>
-      <button class="icon-btn" id="stFindNext" title="다음 (Enter)"><span data-i="down"></span></button>
+      <button class="icon-btn" id="stFindPrev" title="이전 (↑ 또는 Shift+Enter)"><span data-i="up"></span></button>
+      <button class="icon-btn" id="stFindNext" title="다음 (↓ 또는 Enter)"><span data-i="down"></span></button>
       <button class="icon-btn" id="stFindClose" title="닫기 (Esc)"><span data-i="close"></span></button>
       </div>
       <span id="stTools"></span>
@@ -2463,6 +2463,12 @@ let findT = null;
 $("#stFindQ").addEventListener("input", () => { clearTimeout(findT); findT = setTimeout(runFind, 120); });
 $("#stFindQ").addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); clearTimeout(findT); if (fd.ranges.length) stepFind(e.shiftKey ? -1 : 1); else runFind(); }
+  // ↑·↓로 이전·다음 결과 (아직 안 찾았으면 먼저 찾기)
+  if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !e.isComposing) {
+    e.preventDefault(); clearTimeout(findT);
+    if (fd.ranges.length) stepFind(e.key === "ArrowUp" ? -1 : 1);
+    else runFind();  // 첫 결과로 간다
+  }
 });
 $("#stFindPrev").onclick = () => { stepFind(-1); $("#stFindQ").focus(); };
 $("#stFindNext").onclick = () => { stepFind(1); $("#stFindQ").focus(); };
