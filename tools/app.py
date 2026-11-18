@@ -304,7 +304,20 @@ def app_state() -> dict:
         subjects.append({"name": name, "files": files, "cards": s.get("카드수", 0),
                          "due": s.get("오늘복습", 0), "weak": s.get("자주틀린주제", [])[:3]})
     return {"subjects": subjects, "due": sum(s["due"] for s in subjects), "syncing": is_syncing,
-            "ai": engines.current_name(), "onedrive": onedrive_sync.enabled()}
+            "ai": engines.current_name(), "onedrive": onedrive_sync.enabled(), "codeSync": take_code_sync()}
+
+
+CODE_SYNC_FILE = ROOT / "local" / "code_sync.json"
+
+
+def take_code_sync() -> str:
+    """앱을 켤 때 launch.pyw가 남긴 코드 동기화 안내 (받아옴·실패 이유). 한 번 보여 주면 지운다."""
+    try:
+        msg = json.loads(CODE_SYNC_FILE.read_text(encoding="utf-8")).get("message", "")
+        CODE_SYNC_FILE.unlink()
+        return msg
+    except Exception:
+        return ""
 
 
 onedrive_lock = threading.Lock()

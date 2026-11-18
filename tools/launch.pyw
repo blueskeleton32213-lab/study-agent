@@ -32,18 +32,65 @@ def git(*args: str, timeout: int = 15) -> subprocess.CompletedProcess | None:
         return None
 
 
+CODE_SYNC_FILE = ROOT / "local" / "code_sync.json"  # 앱 화면이 한 번 읽고 지우는 안내 (app.py app_state)
+
+
+def ok(r: subprocess.CompletedProcess | None) -> bool:
+    return r is not None and r.returncode == 0
+
+
+def ahead_behind() -> tuple[int, int] | None:
+    r = git("rev-list", "--left-right", "--count", "HEAD...@{u}")
+    if not ok(r):
+        return None
+    a, b = r.stdout.split()
+    return int(a), int(b)
+
+
+def notice(msg: str) -> None:
+    try:
+        CODE_SYNC_FILE.parent.mkdir(exist_ok=True)
+        CODE_SYNC_FILE.write_text(json.dumps({"message": msg}, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def sync_pull() -> None:
-    """다른 컴퓨터에서 고친 코드를 받아온다. 고치다 만 파일이 있거나 갈라졌으면 건드리지 않는다."""
-    st = git("status", "--porcelain", "--untracked-files=no")
-    if st is None or st.returncode or st.stdout.strip():
+    """다른 컴퓨터에서 고친 코드를 받고, 이 컴퓨터에서 커밋만 하고 못 올린 코드는 올린다.
+    양쪽에서 따로 커밋해 갈라졌으면 이 컴퓨터 커밋을 받은 코드 위로 옮긴다(rebase). 충돌하면 되돌리고 안내만 한다.
+    인터넷이 없으면 조용히 넘어간다."""
+    if not ok(git("fetch", "--quiet", timeout=20)):
         return
-    git("pull", "--ff-only", "--quiet", timeout=20)
+    counts = ahead_behind()
+    if counts is None:
+        return
+    ahead, behind = counts
+    if behind:
+        st = git("status", "--porcelain", "--untracked-files=no")
+        if not ok(st):
+            return
+        if st.stdout.strip():
+            files = ", ".join(line[3:] for line in st.stdout.splitlines()[:3])
+            notice(f"다른 컴퓨터에서 고친 코드 {behind}개를 받지 못했어요. 이 컴퓨터에 커밋 안 한 변경이 있어요 ({files}). "
+                   "커밋하거나 되돌린 뒤 앱을 다시 켜 주세요.")
+            return
+        if ahead:
+            if not ok(git("rebase", "--quiet", "@{u}", timeout=30)):
+                git("rebase", "--abort")
+                notice(f"이 컴퓨터 커밋 {ahead}개와 다른 컴퓨터 커밋 {behind}개가 같은 곳을 고쳐서 자동으로 합치지 못했어요. "
+                       "Claude에게 「git 충돌 해결해줘」라고 말해 주세요.")
+                return
+        elif not ok(git("merge", "--ff-only", "--quiet", "@{u}", timeout=20)):
+            notice("다른 컴퓨터에서 고친 코드를 받지 못했어요. 다음에 켤 때 다시 시도해요.")
+            return
+        notice(f"다른 컴퓨터에서 고친 코드 {behind}개를 받아왔어요.")
+    sync_push()  # 끌 때 못 올린 커밋(앱 밖에서 커밋했거나 창을 닫지 않고 껐을 때)도 여기서 올린다
 
 
 def sync_push() -> None:
     """이 컴퓨터에서 커밋한 코드를 올려 둔다 (커밋 안 한 변경은 올리지 않음)."""
-    ahead = git("rev-list", "--count", "@{u}..HEAD")
-    if ahead and ahead.returncode == 0 and ahead.stdout.strip() not in ("", "0"):
+    counts = ahead_behind()
+    if counts and counts[0]:
         git("push", "--quiet", timeout=30)
 
 

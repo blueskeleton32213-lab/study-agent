@@ -1609,6 +1609,8 @@ async function loadState(opt = {}) {
     if (!loadState.syncing) toast("자료 폴더가 바뀐 걸 찾아서 반영하는 중이에요", 3000);
     loadState.syncing = true;
   } else if (loadState.syncing) { loadState.syncing = false; toast("바뀐 자료를 반영했어요"); }
+  if (next.codeSync) toast(next.codeSync, 7000);  // 켤 때 GitHub에서 코드를 받아왔거나 못 받은 이유
+  delete next.codeSync;  // 한 번만 오는 값이라 바뀜 비교에서 뺀다
   scheduleState(next.syncing ? 1500 : document.hidden ? 20000 : 4000);
   const json = JSON.stringify(next);
   // 바뀐 게 없으면 다시 그리지 않는다 (끌기·키보드 포커스가 끊기지 않게). 과목을 끌고 있는 중에도 미룬다
