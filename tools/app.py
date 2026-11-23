@@ -53,6 +53,17 @@ state_lock = threading.Lock()
 # Claude 실행 칸: chat(질문·설명) / quiz(퀴즈 출제·시험 스타일 분석) / studio(스튜디오 만들기).
 # 칸마다 하나씩이라 퀴즈를 만드는 동안에도 질문하거나 스튜디오 자료를 만들 수 있다
 procs: dict[str, subprocess.Popen] = {}
+# 여러 번 AI를 부르는 작업(퀴즈 = 스타일 분석 → 출제)이 칸마다 하나. 취소하면 stopped가 켜져 다음 단계를 시작하지 않는다
+jobs: dict[str, dict] = {}
+
+
+class Stopped(Exception):
+    """사용자가 취소함 — 다음 단계로 넘어가지 않는다"""
+
+
+def job_stopped(slot: str) -> bool:
+    with state_lock:
+        return bool(jobs.get(slot, {}).get("stopped"))
 
 
 def is_busy(slot: str | None = None) -> bool:
@@ -484,11 +495,15 @@ def stream_claude(message: str, session_id: str | None, send, schema: dict | Non
     """설정에서 고른 AI 엔진을 실행하며 이벤트를 send로 흘려보낸다. on_result가 있으면 result 이벤트를 넘겨준다.
     schema: 답을 이 JSON 모양으로 받는다 (result의 structured_output). kind: 모델 선택·사용량 기록용 이름 (없으면 slot)
     web: 이번 실행에만 인터넷 검색을 켠다 (퀴즈의 '인터넷에서 답 찾기' — 사용자가 개수를 고른 뒤에만)"""
+    if job_stopped(slot):
+        raise Stopped()
     run = engines.start(kind or slot, message, session_id, schema, web=web)
     proc = run.proc
     with state_lock:
         procs[slot] = proc
     try:
+        if job_stopped(slot):  # 시작하는 사이에 취소됨
+            raise Stopped()
         for ev in run.events():
             t = ev["type"]
             if t == "tool":
@@ -1046,6 +1061,9 @@ def stop_claude(slot: str | None = None) -> None:
     """slot을 주면 그 칸만, 없으면 전부 멈춘다."""
     with state_lock:
         targets = [p for k, p in procs.items() if slot in (None, k)]
+        for k, job in jobs.items():
+            if slot in (None, k):
+                job["stopped"] = True
     for proc in targets:
         if proc.poll() is None:
             # claude가 띄운 하위 프로세스까지 함께 종료
@@ -1446,6 +1464,9 @@ class Handler(BaseHTTPRequestHandler):
         n = max(1, min(int(data.get("n", 10)), 20))
         if not self._stream_start("quiz"):
             return
+        job = {"stopped": False}
+        with state_lock:
+            jobs["quiz"] = job
         sync_materials()
         send = self._sender("quiz")
         result = {}
@@ -1478,6 +1499,8 @@ class Handler(BaseHTTPRequestHandler):
                                  data.get("qtype", "mix"), guide, note, pool, picks)
             stream_claude(prompt, None, forward, QUIZ_SCHEMA, on_result=result.update, slot="quiz")
             qs = clean_questions((result.get("structured_output") or {}).get("questions") or [])
+            if job_stopped("quiz"):
+                raise Stopped()
             if qs:
                 # 화면을 닫거나 다른 퀴즈를 보고 있어도 남도록 서버에서 바로 기록한다
                 cfg = {k: data.get(k) for k in ("subject", "scope", "n", "level", "qtype", "style")}
@@ -1486,9 +1509,16 @@ class Handler(BaseHTTPRequestHandler):
                 send({"type": "quiz", "questions": qs, "id": saved["id"], "title": saved["title"]})
             elif not result.get("is_error"):
                 send({"type": "error", "message": "문제를 만들지 못했어요. 범위를 바꿔서 다시 해보세요."})
+        except Stopped:  # 취소: 분석 중이었어도 출제로 넘어가지 않고, 만든 문제도 저장하지 않는다
+            send({"type": "error", "message": "출제를 취소했어요."})
+            send({"type": "done"})
         except Exception as exc:
             send({"type": "error", "message": f"출제 실패: {exc}"})
             send({"type": "done"})
+        finally:
+            with state_lock:
+                if jobs.get("quiz") is job:
+                    del jobs["quiz"]
         self.close_connection = True
 
     def _quiz_websolve(self):
