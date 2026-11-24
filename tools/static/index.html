@@ -139,7 +139,12 @@ kbd { font: 500 11px/1 var(--sans); color: inherit; opacity: .6; border: 1px sol
 .subj-del { position: absolute; right: 4px; top: 3px; width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); opacity: 0; }
 .subj-del:hover { color: var(--red); background: var(--red-soft); }
 .subj-row:hover .subj-del, .subj-del:focus-visible { opacity: 1; }
+.subj-sync { position: absolute; right: 32px; top: 3px; width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); opacity: 0; }
+.subj-sync:hover:not(:disabled) { color: var(--pen); background: var(--pen-soft); }
+.subj-row:hover .subj-sync, .subj-sync:focus-visible { opacity: 1; }
+.subj-sync:disabled { cursor: default; }
 .subj-row:hover .subj .n, .subj-row:hover .subj .due, .subj-row:focus-within .subj .n { visibility: hidden; }
+.subj-row:hover .subj, .subj-row:focus-within .subj { padding-right: 64px; }  /* 최신화·삭제 버튼 밑으로 이름이 들어가지 않게 */
 .btn.red { background: var(--red); border-color: var(--red); color: #fff; }
 .btn.red:hover:not(:disabled) { filter: brightness(1.08); border-color: var(--red); }
 .del-list { list-style: none; padding: 0; margin: 14px 0 0; border-top: 1px solid var(--rule); }
@@ -1776,7 +1781,12 @@ function renderSide() {
     del.className = "subj-del"; del.title = `${s.name} 삭제`; del.setAttribute("aria-label", `${s.name} 삭제`);
     del.innerHTML = icon("trash", 16);
     del.onclick = e => { e.stopPropagation(); askDeleteSubject(s.name); };
-    row.append(el, del);
+    // 최신화: 이 과목만 iClass에서 새 자료 받기
+    const sync = document.createElement("button");
+    sync.className = "subj-sync"; sync.title = `${s.name} 최신화 (iClass에서 새 자료 받기)`; sync.setAttribute("aria-label", `${s.name} 최신화`);
+    sync.innerHTML = icon("download", 16); sync.disabled = busy;
+    sync.onclick = e => { e.stopPropagation(); iclassSync([s.name], null); };
+    row.append(el, sync, del);
     box.append(row);
     if (expanded === s.name) box.append(fileList(s));
   }
@@ -2188,7 +2198,8 @@ for (const id of ["#icUser", "#icPw"]) $(id).addEventListener("keydown", e => { 
 });
 // 대화창에서 "최신으로 받아줘", "iClass에서 과목 추가해줘" 같은 말은 Claude 대신 바로 받기로
 // '받아들이다'·'iClass 과제 마감?' 같은 질문은 걸리지 않게, 받기를 뜻하는 말이 있을 때만
-const ICLASS_RE = /((i-?class|아이클래스).*(받아\s*(줘|와|오|올|놔|둬)|받기|받자|가져\s*(와|오)|불러\s*(와|오)|동기화|다운|추가|최신))|((최신|새\s*(자료|파일|강의)|새로\s*올라온|올라온\s*(자료|거)).*(받아\s*(줘|와|오|올|놔|둬)|받기|받자|가져\s*(와|오)|불러\s*(와|오)|동기화|다운))|(과목.*(추가해|받아\s*(줘|와|오)|가져\s*(와|오)))/i;
+// '받아' 뒤 어미는 다 허용 (받아줘·받아주세요·받아 줄래·받아달라·받아봐), '받아들'만 뺀다
+const ICLASS_RE = /((i-?class|아이클래스).*(받아(?!\s*들)|받기|받자|받을래|가져\s*(와|오)|불러\s*(와|오)|동기화|다운|추가|최신))|((최신|새\s*(자료|파일|강의)|새로\s*올라온|올라온\s*(자료|거)).*(받아(?!\s*들)|받기|받자|받을래|가져\s*(와|오)|불러\s*(와|오)|동기화|다운))|(최신화\s*(해|하|시켜))|(과목.*(추가해|받아(?!\s*들)|가져\s*(와|오)))/i;
 
 /* ── 메뉴·머리 버튼 ── */
 const scope = () => current ? ` ${current}` : "";
@@ -2359,7 +2370,7 @@ function renderStudio() {
     $("#stPrint").onclick = () => {  // PDF로 저장할 때 파일 이름 = 자료 제목 (창 제목을 잠깐 바꿨다가 되돌린다)
       $("#printArea").innerHTML = $("#stDoc").innerHTML;
       const old = document.title;
-      document.title = (d.title || "정리 자료").replace(/[\\/:*?"<>|]+/g, " ").trim();
+      document.title = (d.title || "정리 자료").replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
       window.addEventListener("afterprint", () => { document.title = old; }, { once: true });
       window.print();
     };
