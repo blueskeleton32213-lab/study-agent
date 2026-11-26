@@ -42,6 +42,7 @@ PYTHON = sys.executable.replace("pythonw.exe", "python.exe")
 # 사용량은 engines.py가 data/usage.jsonl에 기록 (요약: python tools/usage.py)
 import engines  # noqa: E402
 import onedrive_sync  # noqa: E402  OneDrive 동기화 켜기/끄기 (사이드바)
+import plan  # noqa: E402  시험 대비 계획표 (data/plans, 계획 짜기·자동 체크·밀린 칸 다시 나누기는 스크립트가 한다)
 
 def code_version() -> float:
     """서버 코드(tools/*.py)의 최신 수정 시각. 실행 중에 코드가 바뀌면 launch.pyw가 서버를 교체한다."""
@@ -565,7 +566,7 @@ QTYPES = {"mix": "객관식과 서술형을 반반 정도 섞어서", "mcq": "�
 # ───────────────────────── 과목별 시험 스타일 ─────────────────────────
 # 파일명으로 시험·문제 자료를 찾는다 (중간고사·기출·모의고사·퀴즈·문제지·해설·형광펜 문항·연습문제·Question 등)
 # 강의 파일 속에 섞인 예제·연습문제는 파일명으로 못 찾으니, 분석할 때 AI가 본문을 검색해서 찾는다 (style_prompt)
-EXAM_RE = re.compile(r"중간|기말|기출|모의|퀴즈|quiz|문제|해설|solution|답안|정답|시험|exam|형광펜|question|exercise|연습", re.I)
+EXAM_RE = plan.EXAM_RE  # 계획표도 같은 규칙으로 강의자료와 시험 자료를 나눈다
 STYLES = ROOT / "data" / "styles"
 # pool: 문제 지도 — 따로 준 문제·강의 속 예제/연습문제·시험에 뽑힌 문제의 위치와 답이 있는지 (문제 본문은 안 옮김)
 POOL_ITEM = {"type": "object", "properties": {
@@ -1173,6 +1174,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(json.loads(p.read_text(encoding="utf-8")))
             except (ValueError, OSError) as exc:
                 self._json({"error": f"대화 기록을 열지 못했어요: {exc}"}, 404)
+        elif path == "/api/plan":  # 계획표: 과목의 계획(자동 체크·밀린 칸 다시 나누기 포함) + 넣을 수 있는 강의자료
+            try:
+                subj = safe_name(parse_qs(urlparse(self.path).query)["subject"][0])
+                self._json({"plan": plan.view(subj), "candidates": plan.candidates(subj), "future": plan.future_hint(subj)})
+            except (ValueError, KeyError) as exc:
+                self._json({"error": str(exc)}, 400)
+        elif path == "/api/plans/all":  # 계획표 달력: 모든 과목의 전체 일정
+            self._json({"plans": plan.calendar([p.name for p in MATERIALS.iterdir() if p.is_dir()] if MATERIALS.exists() else [])})
+        elif path == "/api/plans":  # 처음 화면 '오늘 할 일': 계획이 있는 과목마다 오늘 칸
+            self._json({"plans": plan.summary([p.name for p in MATERIALS.iterdir() if p.is_dir()] if MATERIALS.exists() else [])})
         elif path == "/api/quizzes":
             self._json({"quizzes": quiz_list()})
         elif path == "/api/reviews":
@@ -1303,6 +1314,17 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/card/delete":
                 with srs_lock:
                     srs.delete(int(json.loads(self._body())["id"]))
+                return self._json({"ok": True})
+            if url.path == "/api/plan/make":
+                d = json.loads(self._body())
+                return self._json({"plan": plan.make(safe_name(d["subject"]), d["exam"], d.get("files") or [],
+                                                     None, [int(x) for x in d.get("off") or []],
+                                                     d.get("future"))})
+            if url.path == "/api/plan/toggle":
+                d = json.loads(self._body())
+                return self._json({"plan": plan.toggle(safe_name(d["subject"]), int(d["id"]), bool(d.get("done")))})
+            if url.path == "/api/plan/delete":
+                plan.delete(safe_name(json.loads(self._body())["subject"]))
                 return self._json({"ok": True})
             if url.path == "/api/subject":
                 name = safe_name(json.loads(self._body())["name"])

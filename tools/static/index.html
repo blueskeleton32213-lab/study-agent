@@ -578,6 +578,119 @@ body.side-collapsed .nav-item .sw { display: none; }
 main.histing #chat, main.histing .composer { display: none; }
 #historyv { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 #historyv[hidden] { display: none; }
+
+/* 시험 계획표 */
+main.planning #chat, main.planning .composer { display: none; }
+:root { --s0: #9B8CFF; --s1: #2DD4BF; --s2: #FBBF24; --s3: #FB7185; --s4: #60A5FA; --s5: #4ADE80; --s6: #F472B6; --s7: #A3E635; }
+:root[data-theme="day"] { --s0: #6B5BEF; --s1: #0D9488; --s2: #C2780A; --s3: #E11D48; --s4: #2563EB; --s5: #16A34A; --s6: #DB2777; --s7: #65A30D; }
+#planv.cal-mode #pvSubj { display: none; }
+#planv .mode-top { max-width: 1100px; }
+#planv.cal-mode .st-wrap { max-width: 1060px; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 14px; }
+.cal-chip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--rule-strong); font-size: 13px; color: var(--ink-2); background: transparent; }
+.cal-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+.cal-chip b { color: var(--ink); font-weight: 650; }
+.cal-chip.on { border-color: var(--c); box-shadow: 0 0 0 1px var(--c) inset; }
+.cal-chip.off { opacity: .45; }
+.cal-chip.add { border-style: dashed; color: var(--muted); }
+.cal-chip.add:hover { color: var(--pen); border-color: var(--pen); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.cal-wd { font-size: 12px; font-weight: 650; color: var(--muted); padding: 7px 8px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); background: var(--sunk); }
+.cal-wd.sun { color: var(--red); }
+.cal-wd.sat { color: var(--s4); }
+.cal-cell { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-height: 104px; padding: 6px 6px 7px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); background: var(--surface); text-align: left; min-width: 0; font-size: 12px; }
+.cal-cell:hover { background: var(--raised); }
+.cal-cell.past { background: var(--bg); }
+.cal-cell.past > * { opacity: .55; }
+.cal-cell.out { background: var(--bg); }
+.cal-cell.sel { box-shadow: 0 0 0 2px var(--pen) inset; }
+.cal-cell .dn { display: flex; align-items: center; gap: 6px; font-weight: 650; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.cal-cell.today .dn b { background: var(--pen); color: var(--pen-ink); border-radius: 99px; padding: 0 7px; }
+.cal-cell .dn .tm { margin-left: auto; font-weight: 500; color: var(--muted); font-size: 11px; }
+.cal-cell .dn .tm.heavy { color: var(--amber); font-weight: 650; }
+.cal-line { display: flex; align-items: center; gap: 5px; min-width: 0; padding: 2px 6px; border-radius: 5px; background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--ink); }
+.cal-line i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
+.cal-line span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.cal-line em { font-style: normal; color: var(--muted); font-size: 11px; flex: none; }
+.cal-line.done { background: transparent; color: var(--muted); }
+.cal-line.done span { text-decoration: line-through; }
+.cal-line.exam { background: var(--c); color: var(--bg); font-weight: 700; }
+.cal-line.exam i { background: var(--bg); }
+.cal-detail { margin-top: 22px; }
+.cal-detail > .st-h { display: flex; align-items: baseline; gap: 10px; font-size: 15px; color: var(--ink); margin: 0 0 4px; }
+.cal-detail > .st-h .meta { font-size: 13px; font-weight: 500; }
+.cal-sub { margin-top: 14px; }
+.cal-sub .hd { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 650; padding: 6px 0; }
+.cal-sub .hd i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.cal-sub .hd .btn { margin-left: auto; height: 28px; font-size: 12.5px; }
+.cal-sub .pv-list { border-top: 1px solid var(--rule); }
+@media (max-width: 760px) {
+  #planv .st-top-title { display: none; }
+  .cal-cell { min-height: 62px; padding: 4px 3px; gap: 2px; }
+  .cal-cell .dn .tm { display: none; }
+  .cal-line { padding: 0; background: transparent; justify-content: center; }
+  .cal-line span, .cal-line em { display: none; }
+  .cal-line i { width: 8px; height: 8px; }
+  .cal-line.exam { background: var(--c); border-radius: 4px; height: 10px; }
+}
+#planv { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+#planv[hidden] { display: none; }
+.pv-head { display: flex; align-items: flex-end; gap: 18px; padding: 6px 2px 16px; border-bottom: 1px solid var(--rule); margin-bottom: 18px; flex-wrap: wrap; }
+.pv-dday { font: 700 40px/1 var(--serif); letter-spacing: -.02em; }
+.pv-dday small { font: 600 14px/1 var(--sans); color: var(--muted); margin-left: 8px; letter-spacing: 0; }
+.pv-prog { flex: 1; min-width: 180px; }
+.pv-prog .prog { height: 6px; margin-top: 8px; }
+.pv-prog .meta { display: block; }
+.pv-note { padding: 10px 14px; border-radius: 10px; font-size: 13.5px; margin-bottom: 12px; line-height: 1.55; }
+.pv-note.info { background: var(--hl-soft); color: var(--ink); }
+.pv-note.warn { background: var(--amber-soft); color: var(--ink); }
+.pv-note .btn { height: 28px; font-size: 12.5px; margin-left: 8px; }
+.pv-day > .st-h { display: flex; align-items: baseline; gap: 8px; margin: 22px 0 6px; }
+.pv-day.today > .st-h { color: var(--pen); }
+.pv-day.past { opacity: .6; }
+.pv-tag { font-size: 11.5px; font-weight: 650; padding: 2px 8px; border-radius: 99px; background: var(--pen-soft); color: var(--pen); }
+.pv-tag.rv { background: var(--amber-soft); color: var(--amber); }
+.pv-list { border-top: 1px solid var(--rule); }
+.pv-task { display: flex; align-items: center; gap: 12px; padding: 10px 4px 10px 2px; border-bottom: 1px solid var(--rule); font-size: 14px; }
+.pv-task .ck { flex: none; width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid var(--rule-strong); display: grid; place-items: center; color: var(--pen-ink); }
+.pv-task .ck:hover { border-color: var(--pen); }
+.pv-task .ck:disabled { cursor: default; border-style: dashed; }
+.pv-task.done .ck { background: var(--pen); border-color: var(--pen); }
+.pv-task.done .tx b { color: var(--muted); text-decoration: line-through; font-weight: 500; }
+.pv-task .tx { flex: 1; min-width: 0; }
+.pv-task .tx b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-task .tx .meta { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-task .w { font-size: 11.5px; font-weight: 700; color: var(--amber); font-variant-numeric: tabular-nums; margin-left: 6px; }
+.pv-task .go { height: 30px; font-size: 12.5px; flex: none; }
+.pv-task .min { color: var(--muted); font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pv-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; margin-bottom: 20px; }
+.pv-form label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+.pv-form input, .pv-form select { width: 100%; height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--rule-strong); background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; color-scheme: light dark; }
+.pv-form .full { grid-column: 1 / -1; }
+.pv-form .seg button.on { background: var(--pen-soft); color: var(--pen); box-shadow: 0 0 0 1px var(--pen); }
+.pv-files { border-top: 1px solid var(--rule); margin-bottom: 18px; }
+.pv-file { display: flex; align-items: center; gap: 12px; padding: 9px 4px 9px 2px; border-bottom: 1px solid var(--rule); font-size: 14px; cursor: pointer; }
+.pv-file input { width: 17px; height: 17px; accent-color: var(--pen); flex: none; }
+.pv-file .tx { flex: 1; min-width: 0; }
+.pv-file .tx b { display: block; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-file .w { font-size: 12px; font-weight: 700; color: var(--amber); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pv-sum { position: sticky; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 12px 0; background: var(--bg); border-top: 1px solid var(--rule); flex-wrap: wrap; }
+.pv-sum .tx { flex: 1; font-size: 13.5px; color: var(--ink-2); min-width: 200px; }
+.pv-sel { display: flex; gap: 6px; margin: 0 0 8px; align-items: baseline; }
+.pv-sel .st-h { margin: 0; flex: 1; }
+.pv-sel .btn { height: 28px; font-size: 12.5px; }
+.today-plan { border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); padding: 14px 16px 4px; margin-bottom: 12px; }
+.today-plan .hd { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+.today-plan .hd b { font-size: 15px; }
+.today-plan .hd .btn { margin-left: auto; height: 28px; font-size: 12.5px; }
+.today-plan .pv-list { border-top: 0; }
+.today-plan .pv-task:last-child { border-bottom: 0; }
+.today-plan .blank { border: 0; padding: 8px 0 12px; }
+#todayPlans:not(:empty) { margin-bottom: 36px; }
+.plan-hint:not(:empty) { margin-top: 22px; font-size: 13.5px; color: var(--muted); }
+.plan-hint a { color: var(--pen); cursor: pointer; }
+#pvSubj { min-width: 0; flex: 0 1 auto; }
+@media (max-width: 760px) { .pv-form { grid-template-columns: 1fr; } .pv-task .min { display: none; } #planv .st-top-title, #pvTools .lbl { display: none; } }
 #hvSearch { height: 36px; width: min(280px, 45%); padding: 0 12px; border-radius: 8px; border: 1px solid var(--rule-strong); background: var(--sunk); color: var(--ink); font: inherit; font-size: 14px; }
 #hvSearch:focus { outline: 0; border-color: var(--pen); box-shadow: 0 0 0 3px var(--pen-soft); }
 .chat-group { margin-bottom: 26px; }
@@ -765,6 +878,7 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
     <button class="nav-item" data-act="chat" title="질문하기" aria-label="질문하기"><span data-i="chat"></span><span class="lbl">질문하기</span></button>
     <button class="nav-item" data-act="quiz" title="퀴즈" aria-label="퀴즈"><span data-i="quiz"></span><span class="lbl">퀴즈</span></button>
     <button class="nav-item" data-act="review" title="복습" aria-label="복습"><span data-i="review"></span><span class="lbl">복습</span><span class="count" id="dueNum"></span></button>
+    <button class="nav-item" data-act="plan" title="시험 계획표: 시험 날짜에서 거꾸로 하루 할 일을 짜요" aria-label="시험 계획표"><span data-i="calendar"></span><span class="lbl">계획표</span><span class="count" id="planNum"></span></button>
     <button class="nav-item" data-act="studio" title="스튜디오" aria-label="스튜디오"><span data-i="studio"></span><span class="lbl">스튜디오</span></button>
     <button class="nav-item" data-act="history" title="대화 기록" aria-label="대화 기록"><span data-i="clock"></span><span class="lbl">대화 기록</span></button>
     <button class="nav-item" data-act="ai" title="AI 설정 (Claude·GPT·Gemini, 요금제)" aria-label="AI 설정"><span data-i="spark"></span><span class="lbl">AI 설정</span><span class="ai-name" id="aiName"></span></button>
@@ -797,6 +911,19 @@ a.cite:hover, a.cite.on { color: var(--on-hl); background: var(--hl); border-bot
       <input id="hvSearch" type="search" placeholder="제목이나 내용으로 찾기" aria-label="대화 기록 검색">
     </div>
     <div class="stage" id="hvStage"></div>
+  </section>
+  <section id="planv" hidden>
+    <div class="mode-top">
+      <button class="icon-btn" id="pvExit" title="닫기 (Esc)"></button>
+      <span class="st-top-title">시험 계획표</span>
+      <div class="seg" id="pvMode" role="tablist" aria-label="보기" style="width:150px">
+        <button data-m="cal" class="on" role="tab">달력</button><button data-m="subj" role="tab">과목별</button>
+      </div>
+      <select id="pvSubj" title="과목"></select>
+      <span class="st-sp"></span>
+      <span id="pvTools" style="display:flex;gap:6px"></span>
+    </div>
+    <div class="stage" id="pvStage"></div>
   </section>
   <section id="studiov" hidden>
     <div class="mode-top">
@@ -1048,6 +1175,8 @@ const ICONS = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   edit: '<path d="M14.5 5.5l4 4L8 20H4v-4z"/>',
   folder: '<path d="M3.5 6.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
   grip: '<circle cx="9" cy="6" r="1" fill="currentColor"/><circle cx="15" cy="6" r="1" fill="currentColor"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="18" r="1" fill="currentColor"/><circle cx="15" cy="18" r="1" fill="currentColor"/>',
@@ -1070,7 +1199,7 @@ const ICONS = {
 const icon = (n, s = 18) => `<svg class="i" viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true">${ICONS[n] || ""}</svg>`;
 document.querySelectorAll("[data-i]").forEach(el => { el.outerHTML = icon(el.dataset.i); });
 $("#sendBtn").innerHTML = icon("send");
-for (const id of ["#qzExit", "#rvExit", "#stExit"]) $(id).innerHTML = icon("close");
+for (const id of ["#qzExit", "#rvExit", "#stExit", "#pvExit"]) $(id).innerHTML = icon("close");
 
 // 인터넷이 없으면 AI CLI가 답 없이 재시도만 해서 무한 로딩 → 보내기 전에 막고, 답하는 중에 끊기면 멈춘다 (서버도 한 번 더 확인)
 const OFFLINE = "인터넷에 연결되어 있지 않아요. 인터넷을 연결해서 사용해주세요.";
@@ -1699,6 +1828,9 @@ function followSubject() {
   if (hv) { hv.subj = current; renderChats(); }
   if (rl && !rv) { rl.subj = current; showReviewList(); }  // 오늘 복습할 카드 수도 이 과목으로 다시 센다
   if (ql) { ql.subj = current; renderQuizList(); }
+  if (pv?.mode === "subj" && pv.subject !== current && state.subjects.some(s => s.name === current && s.files.length)) {
+    pv.subject = current; $("#pvSubj").value = current; pv.setup = false; loadPlan();
+  }
 }
 let dragSubj = null;
 // 과목 moving을 target 앞(before) 또는 뒤로 옮기고, 순서를 서버에 저장
@@ -1807,7 +1939,7 @@ function renderSide() {
 }
 function updateNav() {
   const m = $("main").classList;
-  const mode = m.contains("reviewing") ? "review" : m.contains("quizzing") ? "quiz" : m.contains("studio") ? "studio" : m.contains("histing") ? "history" : "chat";
+  const mode = m.contains("reviewing") ? "review" : m.contains("quizzing") ? "quiz" : m.contains("studio") ? "studio" : m.contains("histing") ? "history" : m.contains("planning") ? "plan" : "chat";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("on", b.dataset.act === mode));
 }
 new MutationObserver(updateNav).observe($("main"), { attributes: true, attributeFilter: ["class"] });
@@ -1871,13 +2003,14 @@ function bubble(role, text, cites, subj) {
 function renderHistory() {
   $("#msgs").innerHTML = "";
   if (!history.length) {
-    $("#msgs").innerHTML = `<div class="empty"><h2>무엇을 공부해볼까요?</h2>
+    $("#msgs").innerHTML = `<div class="empty"><div id="todayPlans"></div><h2>무엇을 공부해볼까요?</h2>
       <p>강의자료를 근거로 설명하고, 퀴즈를 내고, 틀린 문제는 복습 일정에 맞춰 다시 물어봐요.</p>
       <ol>
         <li><span><b>과목을 고르세요.</b> 왼쪽 목록에서 고르거나 + 버튼으로 새로 만들어요.</span></li>
         <li><span><b>자료를 넣으세요.</b> PDF·PPTX·DOCX를 과목 이름 위로 끌어다 놓으면 읽고 요약해요.</span></li>
         <li><span><b>공부를 시작하세요.</b> 아래에 질문하거나 왼쪽의 퀴즈, 복습, 스튜디오를 열어요.</span></li>
-      </ol></div>`;
+      </ol><p class="plan-hint" id="planHint"></p></div>`;
+    loadTodayPlans();
     return;
   }
   let subj = null;  // 답변은 바로 앞 질문의 과목을 따른다
@@ -2109,6 +2242,7 @@ $("#aiDlg").addEventListener("close", () => { $("#aiKey").value = ""; });
 
 async function iclassSync(subjects = [], shown = null) {
   if (busy) return toast("다른 작업이 끝난 뒤에 받을 수 있어요");
+  if (pv) closePlan();
   if (rv || rl) closeReview();
   if (qz || ql) closeQuiz();
   if (st) closeStudio();
@@ -2223,6 +2357,7 @@ async function weakAnalysis(subject) {
 document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
   const a = b.dataset.act;
   if (a === "chat") {
+    if (pv) closePlan();
     if (rv || rl) closeReview();
     if (qz || ql) closeQuiz();
     if (st) closeStudio();
@@ -2232,6 +2367,7 @@ document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
   if (a === "new") {
     if (busy) return toast("답변이 끝난 뒤에 눌러주세요");
     // 스튜디오·퀴즈·복습 화면에 있어도 대화 화면으로 돌아와서 새로 시작
+    if (pv) closePlan();
     if (rv || rl) closeReview();
     if (qz || ql) closeQuiz();
     if (st) closeStudio();
@@ -2243,6 +2379,7 @@ document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
   if (a === "quiz") return openQuizSetup();
   if (a === "studio") return openStudio();
   if (a === "history") return openHistory();
+  if (a === "plan") return openPlan();
   if (a === "ai") return openAI();
   if (a === "review") return openReview();
   // 과목·자료·기록이 없으면 Claude를 부르지 않고 안내만
@@ -2276,6 +2413,429 @@ for (const id of ["#quizDlg", "#stDlg"]) $(id).addEventListener("keydown", e => 
 });
 $("#qType").onclick = e => { const b = e.target.closest("button"); if (!b) return; $("#qType .on").classList.remove("on"); b.classList.add("on"); };
 
+/* ── 시험 계획표: 시험 날짜에서 거꾸로 짠 하루 할 일 (계획 짜기·자동 체크·밀린 칸 다시 나누기는 서버의 tools/plan.py) ── */
+var pv = null; // { subject, data: { plan, candidates }, setup, form }  (var: 다른 화면 코드가 먼저 불러도 되게)
+const WEEK = ["월", "화", "수", "목", "금", "토", "일"];  // plan.py와 같은 순서 (월=0)
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const fromIso = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const pyDay = d => (d.getDay() + 6) % 7;
+const SUN_FIRST = [6, 0, 1, 2, 3, 4, 5];  // 달력·쉬는 요일은 일요일부터 보여 준다
+const dayLabel = s => { const d = fromIso(s); return `${d.getMonth() + 1}/${d.getDate()} (${WEEK[pyDay(d)]})`; };
+const stem = f => f.replace(/\.(pdf|pptx|docx)$/i, "");
+const mins = m => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ""}` : `${m}분`;
+const PLAN_GO = { read: "열기", quiz: "퀴즈 풀기", examquiz: "퀴즈 만들기", retry: "퀴즈 기록", patterns: "만들기", summary: "만들기", weak: "분석 받기", cards: "복습 시작", future: "iClass 받기" };
+const futureDue = t => t.kind === "future" && t.part === 1 && t.after <= isoDay(new Date());  // 올라올 날이 지났으면 그 주 첫 칸에서 받아 보게
+
+function taskTitle(t) {
+  if (t.kind === "read") return `${stem(t.file)} · ${t.range}`;
+  if (t.kind === "quiz") return `${stem(t.file)} · 확인 퀴즈 5문제`;
+  if (t.kind === "future") return t.quiz ? `${t.label} · 확인 퀴즈 (자료가 올라오면)` : `${t.label} · 아직 안 올라옴${t.of > 1 ? ` (${t.part}/${t.of})` : ""}`;
+  return t.label;
+}
+function taskSub(t) {
+  if (t.kind === "read") return t.titles?.length ? t.titles.join(" · ") : "";
+  if (t.kind === "quiz") return t.why?.length ? `비중을 정한 이유: ${t.why.join(", ")}` : "이 강의를 다 본 뒤 확인";
+  if (t.kind === "cards") return "간격반복 일정에 맞춰 오늘 볼 카드";
+  if (t.kind === "future") return `${dayLabel(t.after)}쯤 올라올 예정 · 한 주 평균 분량으로 잡아 뒀고, 올라오면 실제 쪽으로 바뀌어요`;
+  return t.done && t.auto ? "앱에서 한 걸 보고 자동으로 체크했어요" : "";
+}
+function taskRow(t, opt = {}) {
+  const w = t.kind === "read" && t.weight && t.weight !== 1
+    ? `<span class="w" title="${esc((t.why || []).join(", ") || "기본 비중")}">×${t.weight}</span>` : "";
+  const sub = taskSub(t);
+  return `<div class="pv-task${t.done ? " done" : ""}" data-id="${t.id ?? ""}" data-subj="${esc(opt.subject || "")}">
+    <button class="ck" ${t.kind === "cards" ? "disabled" : ""} title="${t.done ? "안 한 걸로 되돌리기" : "다 했어요"}" aria-label="${t.done ? "체크 해제" : "체크"}">${t.done ? icon("check", 14) : ""}</button>
+    <span class="tx"><b>${esc(taskTitle(t))}${w}</b>${sub ? `<span class="meta">${esc(sub)}</span>` : ""}</span>
+    ${t.min ? `<span class="min">약 ${mins(t.min)}</span>` : ""}
+    ${t.done || (t.kind === "future" && !futureDue(t)) ? "" : `<button class="btn go" data-go="${t.kind}">${PLAN_GO[t.kind] || "하기"}</button>`}
+  </div>`;
+}
+// 오늘 볼 복습 카드는 계획에 저장하지 않고 그때그때 센다 (srs 일정)
+function cardsTask(subject) {
+  const due = state?.subjects?.find(s => s.name === subject)?.due || 0;
+  return due ? { kind: "cards", label: `복습 카드 ${due}장`, min: Math.max(5, Math.round(due * 1.5)), done: false } : null;
+}
+function bindTasks(root, tasks, subject) {
+  root.querySelectorAll(".pv-task").forEach(row => {
+    const sub = row.dataset.subj || subject;
+    const t = row.dataset.id ? tasks.find(x => String(x.id) === row.dataset.id && (x._subj ?? sub) === sub) : cardsTask(sub);
+    if (!t) return;
+    const ck = row.querySelector(".ck");
+    if (ck && !ck.disabled) ck.onclick = () => togglePlanTask(sub, t);
+    const go = row.querySelector(".go");
+    if (go) go.onclick = () => planGo(sub, t);
+  });
+}
+async function togglePlanTask(subject, t) {
+  try {
+    const r = await (await api("/api/plan/toggle", { method: "POST", body: JSON.stringify({ subject, id: t.id, done: !t.done }) })).json();
+    if (pv?.mode === "cal") loadCalendar();
+    else if (pv && pv.subject === subject) { pv.data.plan = r.plan; renderPlan(); }
+  } catch (e) { return toast(e.message); }
+  loadTodayPlans();
+}
+function planGo(subject, t) {
+  const k = t.kind;
+  if (k === "read") { setSubject(subject); return openViewer(t.file, parseInt(t.range.replace(/^\D+/, "")) || 1, ""); }
+  if (k === "quiz") return startQuiz({ style: "plain", subject, scope: stem(t.file), n: 5, level: "보통", qtype: "mix" });
+  if (k === "cards") { setSubject(subject); return startReview(); }
+  if (k === "weak") { if (pv) closePlan(); return weakAnalysis(subject); }
+  if (k === "retry") return openQuizSetup();
+  if (k === "future") { if (pv) closePlan(); return iclassSync([subject], `${subject} 새 자료 받아줘`); }
+  if (k === "examquiz") {
+    setSubject(subject); if (pv) closePlan();
+    openQuizDialog();
+    if ($("#quizDlg").open) { $("#qNum").value = "15"; $("#qLevel").value = "시험"; }
+    return;
+  }
+  if (k === "patterns" || k === "summary") {
+    setSubject(subject); openStudio();
+    if (st && st.subject === subject) askStudio(k);
+  }
+}
+
+// opt.subject가 있으면 그 과목 '과목별' 보기로, 없으면 모든 과목 달력으로
+function openPlan(opt = {}) {
+  if (rv || rl) closeReview();
+  if (qz || ql) closeQuiz();
+  if (st) closeStudio();
+  if (hv) closeHistory();
+  if (rv || quizShown() || studioShown()) return;
+  const subs = state.subjects.filter(s => s.files.length);
+  if (!subs.length) return toast("먼저 과목을 만들고 자료를 넣어주세요");
+  const subject = opt.subject && subs.some(s => s.name === opt.subject) ? opt.subject : subs.some(s => s.name === current) ? current : subs[0].name;
+  pv = { subject, data: null, setup: false, form: null, mode: opt.subject ? "subj" : "cal", cal: { plans: null, sel: isoDay(new Date()), only: null } };
+  const sel = $("#pvSubj"); sel.innerHTML = "";
+  for (const s of subs) { const o = document.createElement("option"); o.textContent = s.name; o.selected = s.name === subject; sel.append(o); }
+  $("main").classList.add("planning"); $("#planv").hidden = false;
+  if (document.activeElement) document.activeElement.blur();
+  setPlanMode(pv.mode);
+}
+function setPlanMode(m) {
+  pv.mode = m;
+  $("#planv").classList.toggle("cal-mode", m === "cal");
+  $("#pvMode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.m === m));
+  if (m === "cal") loadCalendar(); else { pv.setup = false; loadPlan(); }
+}
+$("#pvMode").onclick = e => { const b = e.target.closest("button"); if (b && pv && b.dataset.m !== pv.mode) setPlanMode(b.dataset.m); };
+// 달력에서 과목 하나를 '과목별'로 (만들기·다시 짜기·자세히)
+function planSubject(subject) { pv.subject = subject; $("#pvSubj").value = subject; setPlanMode("subj"); }
+function closePlan() {
+  pv = null; $("main").classList.remove("planning"); $("#planv").hidden = true;
+  if ($("#todayPlans")) loadTodayPlans();
+}
+async function loadPlan() {
+  const me = pv;
+  $("#pvTools").innerHTML = "";
+  $("#pvStage").innerHTML = '<div class="st-wrap"><div class="typing">불러오는 중</div></div>';
+  let data;
+  try { data = await (await api(`/api/plan?subject=${encodeURIComponent(me.subject)}`)).json(); }
+  catch (e) { if (pv === me) $("#pvStage").innerHTML = `<div class="st-wrap"><div class="blank">${esc(e.message)}</div></div>`; return; }
+  if (pv !== me) return;
+  pv.data = data; renderPlan.scrolled = false;  // 열 때마다 오늘 칸으로 한 번 내려간다
+  if (!data.plan) startPlanSetup();
+  else renderPlan();
+}
+$("#pvSubj").onchange = e => { if (pv) { pv.subject = e.target.value; pv.setup = false; loadPlan(); } };
+$("#pvExit").onclick = () => closePlan();
+
+function startPlanSetup() {
+  const p = pv.data.plan, c = pv.data.candidates;
+  const d14 = new Date(); d14.setDate(d14.getDate() + 14);
+  pv.form = p
+    ? { exam: p.exam, off: new Set(p.off), files: new Set(p.files.filter(f => c.some(x => x.file === f))) }
+    : { exam: isoDay(d14), off: new Set(), files: new Set(c.map(x => x.file)) };
+  // 아직 안 올라온 강의: 다시 짤 때는 이미 올라온 번호를 건너뛴다
+  const h = pv.data.future, d7 = new Date(); d7.setDate(d7.getDate() + 7);
+  const fc = p?.futureCfg, gone = fc ? Math.max(0, h.next - fc.start) : 0;
+  pv.form.future = fc && fc.count - gone > 0
+    ? { start: h.next, count: fc.count - gone, first: isoDay(new Date(Math.max(fromIso(fc.first).getTime() + gone * fc.every * 864e5, Date.now()))), every: fc.every }
+    : { start: h.next, count: 0, first: isoDay(d7), every: 7 };
+  pv.setup = true;
+  renderPlan();
+}
+function planEstimate() {
+  const f = pv.form, c = pv.data.candidates.filter(x => f.files.has(x.file));
+  const need = c.reduce((a, x) => a + x.minutes + 15, 0) + f.future.count * (pv.data.future.minutes + 15);
+  const t = new Date(), exam = fromIso(f.exam || isoDay(t));
+  let days = 0;
+  for (const d = new Date(t.getFullYear(), t.getMonth(), t.getDate()); d < exam; d.setDate(d.getDate() + 1)) if (!f.off.has(pyDay(d))) days++;
+  const rev = days >= 10 ? 3 : days >= 5 ? 2 : days >= 3 ? 1 : 0;
+  // 하루 분량은 정하지 않고 계산: 진도는 복습 기간 전 날들에, 시험 직전 정리는 따로 (plan.py와 같은 방식)
+  return { need, days, rev, learn: days - rev, perDay: Math.round(need / Math.max(days - rev || days, 1)) };
+}
+function renderPlanSetup() {
+  const f = pv.form, c = pv.data.candidates, p = pv.data.plan;
+  $("#pvTools").innerHTML = ""; $("#pvStage").scrollTop = 0;
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  const fileRows = c.length ? c.map((x, i) => `<label class="pv-file">
+      <input type="checkbox" data-k="${i}" ${f.files.has(x.file) ? "checked" : ""}>
+      <span class="tx"><b>${esc(stem(x.file))}</b>${meta([`${x.pages}${x.unit === "p." ? "쪽" : x.unit === "slide" ? "슬라이드" : "단락"}`, `약 ${mins(x.minutes)}`, ...x.why])}</span>
+      ${x.weight !== 1 ? `<span class="w" title="1.0보다 크면 시간을 더, 작으면 덜 줘요">×${x.weight}</span>` : ""}
+    </label>`).join("")
+    : '<div class="blank">이 과목엔 계획에 넣을 강의자료가 없어요. 자료를 넣고 목차가 만들어지면 다시 열어 주세요.</div>';
+  $("#pvStage").innerHTML = `<div class="st-wrap">
+    <p class="desc" style="color:var(--ink-2);margin:4px 0 18px">시험 날짜에서 거꾸로 하루 할 일을 나눠요. 기출·찝어준 문제가 많거나 퀴즈·복습에서 자주 틀린 강의엔 시간을 더 주고, 이미 잘 맞히는 강의는 줄여요. 시험 직전 며칠은 새 진도 없이 기출 유형·약점 정리만 해요.</p>
+    <div class="pv-form">
+      <div><label for="pvExam">시험 날짜</label><input type="date" id="pvExam" min="${isoDay(tomorrow)}" value="${esc(f.exam)}"></div>
+      <div><label>하루 공부 시간</label><div id="pvPerDay" style="height:36px;display:flex;align-items:center;font-size:14px;color:var(--ink-2)"></div></div>
+      <div class="full"><label>쉬는 요일 <span class="opt" style="font-weight:400;color:var(--muted)">(고른 요일엔 할 일을 넣지 않아요)</span></label>
+        <div class="seg" id="pvOff">${SUN_FIRST.map(i => `<button type="button" data-d="${i}" class="${f.off.has(i) ? "on" : ""}">${WEEK[i]}</button>`).join("")}</div></div>
+    </div>
+    <div class="pv-sel"><span class="st-h">시험 범위 강의자료 (${c.length}개)</span>
+      <button class="btn ghost" id="pvAll">전체 선택</button><button class="btn ghost" id="pvNone">전체 해제</button></div>
+    <div class="pv-files">${fileRows}</div>
+    <div class="pv-sel"><span class="st-h">아직 안 올라온 강의</span></div>
+    <div class="pv-form pv-fut">
+      <div><label for="pvFutN">몇 개 더 나와요?</label><select id="pvFutN">${[0, 1, 2, 3, 4, 5, 6].map(n => `<option value="${n}" ${n === f.future.count ? "selected" : ""}>${n ? `${n}개` : "없어요"}</option>`).join("")}</select></div>
+      <div><label for="pvFutStart">첫 번호</label><input type="number" id="pvFutStart" min="1" max="99" value="${f.future.start}"></div>
+      <div><label for="pvFutFirst">첫 강의가 올라오는 날</label><input type="date" id="pvFutFirst" value="${esc(f.future.first)}"></div>
+      <div><label for="pvFutEvery">그 뒤로</label><select id="pvFutEvery">${[[7, "매주 하나씩"], [3, "3~4일마다 (주 2회)"], [14, "2주마다"]].map(([v, l]) => `<option value="${v}" ${v === f.future.every ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      <p class="full meta" id="pvFutInfo" style="margin:0"></p>
+    </div>
+    <div class="pv-sum"><span class="tx" id="pvEst"></span>
+      <span style="display:flex;gap:8px;margin-left:auto">${p ? '<button class="btn" id="pvCancel">취소</button>' : ""}
+      <button class="btn primary" id="pvMake">${p ? "다시 짜기" : "계획 만들기"}</button></span></div>
+  </div>`;
+  const est = () => {
+    const e = planEstimate(), el = $("#pvEst");
+    if (!f.exam || e.days < 1) { el.innerHTML = "시험 날짜를 내일 이후로 골라주세요."; $("#pvPerDay").textContent = "—"; return; }
+    $("#pvPerDay").innerHTML = e.need ? `시험까지 끝내려면 <b style="color:var(--ink);margin:0 4px">하루 약 ${mins(e.perDay)}</b> (자동 계산)` : "강의자료를 고르면 계산해요";
+    el.innerHTML = `공부할 날 <b>${e.days}일</b>${e.rev ? ` (마지막 ${e.rev}일은 시험 직전 정리)` : ""} · 진도 전체 약 <b>${mins(e.need)}</b> → 하루 약 <b>${mins(e.perDay)}</b>`
+      + (e.perDay > 480 ? `<br><span style="color:var(--amber)">하루 8시간이 넘어요. 범위를 줄이거나 쉬는 요일을 줄여 보세요.</span>` : "");
+  };
+  est();
+  $("#pvExam").onchange = e => { f.exam = e.target.value; est(); };
+  $("#pvOff").onclick = e => { const b = e.target.closest("button"); if (!b) return; const d = +b.dataset.d; f.off.has(d) ? f.off.delete(d) : f.off.add(d); b.classList.toggle("on"); est(); };
+  $("#pvStage").querySelectorAll(".pv-file input").forEach(cb => cb.onchange = () => { const x = c[+cb.dataset.k].file; cb.checked ? f.files.add(x) : f.files.delete(x); est(); });
+  $("#pvAll").onclick = () => { c.forEach(x => f.files.add(x.file)); renderPlanSetup(); };
+  $("#pvNone").onclick = () => { f.files.clear(); renderPlanSetup(); };
+  const fu = f.future, hint = pv.data.future;
+  const futInfo = () => {
+    $("#pvStage").querySelectorAll(".pv-fut > div:not(:first-child)").forEach(el => el.style.opacity = fu.count ? "" : ".45");
+    $("#pvFutInfo").textContent = !fu.count ? `지금 있는 자료는 ${hint.have.length ? `${hint.label.replace("{}", hint.have[0])}~${hint.label.replace("{}", hint.have.at(-1))}` : "번호 없는 자료"}까지예요. 앞으로 나올 강의가 있으면 개수를 골라 주세요.`
+      : Array.from({ length: fu.count }, (_, i) => { const d = fromIso(fu.first); d.setDate(d.getDate() + fu.every * i); return `${hint.label.replace("{}", fu.start + i)} ${d.getMonth() + 1}/${d.getDate()}~`; }).join(" · ")
+        + ` — 한 주 평균 ${hint.pages}쪽(약 ${mins(hint.minutes)})으로 자리를 잡고, 올라온 날 이후에만 넣어요. 자료가 들어오면 실제 쪽으로 바뀌어요.`;
+  };
+  futInfo();
+  $("#pvFutN").onchange = e => { fu.count = +e.target.value; futInfo(); est(); };
+  $("#pvFutStart").onchange = e => { fu.start = Math.max(1, +e.target.value || hint.next); futInfo(); };
+  $("#pvFutFirst").onchange = e => { fu.first = e.target.value || fu.first; futInfo(); };
+  $("#pvFutEvery").onchange = e => { fu.every = +e.target.value; futInfo(); };
+  const cancel = $("#pvCancel"); if (cancel) cancel.onclick = () => { pv.setup = false; renderPlan(); };
+  $("#pvMake").onclick = makePlan;
+}
+async function makePlan() {
+  const f = pv.form, me = pv;
+  if (!f.files.size && !f.future.count) return toast("시험 범위 강의자료를 하나 이상 골라주세요");
+  if (pv.data.plan && !(await ask({ title: "계획을 다시 짤까요?", desc: "지금 계획의 체크 표시는 없어지고 오늘부터 새로 나눠요.", ok: "다시 짜기" }))) return;
+  const files = pv.data.candidates.filter(x => f.files.has(x.file)).map(x => x.file);
+  let r;
+  try { r = await (await api("/api/plan/make", { method: "POST", body: JSON.stringify({ subject: me.subject, exam: f.exam, off: [...f.off], files, future: f.future }) })).json(); }
+  catch (e) { return toast(e.message, 4000); }
+  if (pv !== me) return;
+  pv.data.plan = r.plan; pv.setup = false;
+  pv.cal.sel = isoDay(new Date()); setPlanMode("cal");
+  toast(`${me.subject} 계획을 만들었어요. 달력에 다른 과목과 같이 보여요`, 3500); loadTodayPlans();
+}
+async function deletePlan() {
+  const me = pv;
+  if (!(await ask({ title: "계획표를 지울까요?", desc: `${me.subject} 계획과 체크 표시가 모두 지워져요. 퀴즈·복습 기록은 그대로예요.`, ok: "지우기", danger: true }))) return;
+  try { await api("/api/plan/delete", { method: "POST", body: JSON.stringify({ subject: me.subject }) }); } catch (e) { return toast(e.message); }
+  if (pv !== me) return;
+  pv.data.plan = null; startPlanSetup(); loadTodayPlans();
+}
+function renderPlan() {
+  if (!pv?.data) return;
+  if (pv.setup || !pv.data.plan) return renderPlanSetup();
+  const p = pv.data.plan, todayIso = isoDay(new Date());
+  $("#pvTools").innerHTML = `<button class="btn ghost" id="pvRe" title="날짜·하루 시간·범위를 바꿔서 다시 짜요">${icon("edit", 16)}<span class="lbl">다시 짜기</span></button><button class="btn ghost" id="pvDel" title="계획 지우기">${icon("trash", 16)}</button>`;
+  $("#pvRe").onclick = startPlanSetup; $("#pvDel").onclick = deletePlan;
+  const pct = p.progress.total ? Math.round(p.progress.done / p.progress.total * 100) : 0;
+  const ex = fromIso(p.exam);
+  const card = cardsTask(p.subject);
+  const todayTasks = [...p.today, ...(card ? [card] : [])];
+  const days = p.days.map(d => {
+    const isToday = d.date === todayIso, past = d.date < todayIso;
+    const tasks = isToday && card ? [...d.tasks, card] : d.tasks;
+    const left = d.tasks.filter(t => !t.done).length;
+    return `<div class="pv-day${isToday ? " today" : ""}${past ? " past" : ""}">
+      <div class="st-h">${isToday ? "오늘 · " : ""}${dayLabel(d.date)}${d.review ? '<span class="pv-tag rv">시험 직전 정리</span>' : ""}<span style="margin-left:auto;font-weight:500">${left ? `약 ${mins(d.tasks.filter(t => !t.done).reduce((a, t) => a + t.min, 0))} 남음` : "다 했어요"}</span></div>
+      <div class="pv-list">${tasks.map(t => taskRow(t)).join("")}</div></div>`;
+  }).join("");
+  $("#pvStage").innerHTML = `<div class="st-wrap">
+    <div class="pv-head">
+      <div class="pv-dday">${p.dday > 0 ? `D-${p.dday}` : p.dday === 0 ? "D-day" : "시험 끝"}<small>${ex.getMonth() + 1}월 ${ex.getDate()}일 (${WEEK[pyDay(ex)]}) 시험</small></div>
+      <div class="pv-prog">${meta([`${p.progress.done}/${p.progress.total}칸 (${pct}%)`, p.need ? `시험까지 하루 약 ${mins(p.need)}` : "", p.off.length ? `쉬는 날 ${SUN_FIRST.filter(i => p.off.includes(i)).map(i => WEEK[i]).join("·")}` : "", `강의자료 ${p.files.length}개`, p.tasks.some(t => t.kind === "future" && !t.done) ? `안 올라온 강의 ${new Set(p.tasks.filter(t => t.kind === "future" && !t.done).map(t => t.num)).size}개` : ""])}
+        <div class="prog"><div style="width:${pct}%"></div></div></div>
+    </div>
+    ${p.notice ? `<div class="pv-note info">${esc(p.notice)}. 전체 일정에서 바뀐 날짜를 확인하세요.</div>` : ""}
+    ${p.warn ? `<div class="pv-note warn">${esc(p.warn)}<button class="btn" id="pvShrink">범위 다시 정하기</button></div>` : ""}
+    ${p.days.some(d => d.date === todayIso) || card ? "" : `<div class="pv-day today"><div class="st-h">오늘 · ${dayLabel(todayIso)}</div><div class="blank">오늘은 계획된 할 일이 없어요.</div></div>`}
+    ${!p.days.some(d => d.date === todayIso) && card ? `<div class="pv-day today"><div class="st-h">오늘 · ${dayLabel(todayIso)}</div><div class="pv-list">${taskRow(card)}</div></div>` : ""}
+    ${days}
+    <p class="desc" style="color:var(--muted);font-size:12.5px;margin-top:22px">강의 퀴즈·시험 스타일 퀴즈·기출 유형 분석·시험대비 요약·약점 분석은 앱에서 하면 자동으로 체크돼요. 읽기 칸은 직접 체크하세요. 못 한 칸은 다음 날 남은 날짜에 다시 나눠요.</p>
+  </div>`;
+  const sh = $("#pvShrink"); if (sh) sh.onclick = startPlanSetup;
+  bindTasks($("#pvStage"), [...p.tasks, ...todayTasks.filter(t => t.kind === "cards")], p.subject);
+  const t = $("#pvStage .pv-day.today");
+  // 지난 날이 있으면 오늘 칸으로 한 번 내려간다 (scrollIntoView는 바깥 화면까지 움직여서 직접 계산)
+  if (t && !renderPlan.scrolled && $("#pvStage .pv-day.past")) {
+    const stage = $("#pvStage"); stage.scrollTop += t.getBoundingClientRect().top - stage.getBoundingClientRect().top - 8;
+  }
+  renderPlan.scrolled = true;
+}
+const subjColor = name => { const i = state.subjects.findIndex(s => s.name === name); return `var(--s${(i < 0 ? 0 : i) % 8})`; };
+// 달력 칸에 들어갈 짧은 이름: 파일 이름에서 강의 번호만 (Lecture11, 11주차, Week 3 튜토 …), 없으면 파일 이름
+const shortFile = f => {
+  const m = stem(f).match(/\d+\s*주차|week\s*_?\d+|lecture\s*_?\d+|\d+\s*강|ch(?:apter)?\s*\.?\s*\d+|챕터\s*\d+/i);
+  return m ? `${m[0].replace(/_/g, " ")}${/tutorial|튜토리얼/i.test(f) ? " 튜토" : ""}${/contd/i.test(f) ? " (계속)" : ""}` : stem(f);
+};
+const taskShort = t => t.kind === "read" ? `${shortFile(t.file)} ${t.range}` : t.kind === "quiz" ? `${shortFile(t.file)} 퀴즈`
+  : t.kind === "future" ? `${t.label} (예정)` : t.label.replace(/ 만들어서 보기| 받고 부족한 개념 다시 보기| 만들어서 훑기| \(전체 범위 15문제\)/, "");
+async function loadCalendar() {
+  const me = pv;
+  $("#pvTools").innerHTML = "";
+  if (!pv.cal.plans) $("#pvStage").innerHTML = '<div class="st-wrap"><div class="typing">불러오는 중</div></div>';
+  let plans;
+  try { plans = (await (await api("/api/plans/all")).json()).plans; }
+  catch (e) { if (pv === me) $("#pvStage").innerHTML = `<div class="st-wrap"><div class="blank">${esc(e.message)}</div></div>`; return; }
+  if (pv !== me || pv.mode !== "cal") return;
+  pv.cal.plans = plans;
+  if (pv.cal.only && !plans.some(p => p.subject === pv.cal.only)) pv.cal.only = null;
+  renderCalendar();
+}
+function renderCalendar() {
+  const c = pv.cal, todayIso = isoDay(new Date());
+  const plans = c.plans.filter(p => !c.only || p.subject === c.only);
+  const subs = state.subjects.filter(s => s.files.length);
+  const without = subs.filter(s => !c.plans.some(p => p.subject === s.name));
+  const legend = `<div class="cal-legend" role="group" aria-label="과목">
+    ${c.plans.map(p => `<button class="cal-chip${c.only === p.subject ? " on" : c.only ? " off" : ""}" data-only="${esc(p.subject)}" style="--c:${subjColor(p.subject)}" title="눌러서 이 과목만 보기 (다시 누르면 전체)">
+      <i></i><b>${esc(p.subject)}</b>${p.dday ? `D-${p.dday}` : "D-day"} · ${Math.round(p.progress.done / Math.max(p.progress.total, 1) * 100)}%${p.need ? ` · 하루 ${mins(p.need)}` : ""}</button>`).join("")}
+    ${without.map(s => `<button class="cal-chip add" data-make="${esc(s.name)}" title="이 과목 계획 만들기">${icon("plus", 14)}${esc(s.name)}</button>`).join("")}
+  </div>`;
+  if (!c.plans.length) {
+    $("#pvStage").innerHTML = `<div class="st-wrap">${legend}<div class="blank">아직 만든 계획이 없어요. 위에서 과목을 눌러 시험 날짜와 범위를 정하면, 모든 과목 계획이 이 달력에 같이 보여요.</div></div>`;
+    return bindCalendar();
+  }
+  // 날짜별로 모으기: { iso: [{ subject, tasks }] }, 시험 날
+  const byDay = new Map(), exams = new Map();
+  for (const p of plans) {
+    exams.set(p.exam, [...(exams.get(p.exam) || []), p.subject]);
+    for (const t of p.tasks) {
+      if (!byDay.has(t.date)) byDay.set(t.date, new Map());
+      const m = byDay.get(t.date); if (!m.has(p.subject)) m.set(p.subject, []);
+      m.get(p.subject).push({ ...t, _subj: p.subject });
+    }
+  }
+  // 범위: 오늘이 있는 주(지난 일정이 있으면 최대 2주 전부터) ~ 마지막 시험이 있는 주
+  const allDates = [...byDay.keys(), ...exams.keys()].sort();
+  let start = fromIso(todayIso), end = fromIso(allDates.at(-1) > todayIso ? allDates.at(-1) : todayIso);
+  const earliest = allDates[0] < todayIso ? fromIso(allDates[0]) : start;
+  const twoWeeks = new Date(start); twoWeeks.setDate(twoWeeks.getDate() - 14);
+  start = earliest < twoWeeks ? twoWeeks : earliest;
+  start.setDate(start.getDate() - start.getDay());  // 일요일부터
+  end.setDate(end.getDate() + (6 - end.getDay()));
+  if (!(c.sel >= isoDay(start) && c.sel <= isoDay(end))) c.sel = todayIso;
+  const daily = plans.reduce((a, p) => a + p.need, 0);  // 과목마다 '시험까지 끝내려면 하루 얼마'를 더한 값
+  let cells = SUN_FIRST.map(i => `<div class="cal-wd${i === 6 ? " sun" : i === 5 ? " sat" : ""}">${WEEK[i]}</div>`).join("");
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const iso = isoDay(d), m = byDay.get(iso) || new Map();
+    const lines = [];
+    for (const sub of exams.get(iso) || []) lines.push(`<span class="cal-line exam" style="--c:${subjColor(sub)}"><i></i><span>${esc(sub)} 시험</span></span>`);
+    let left = 0;
+    for (const [sub, ts] of m) {
+      const undone = ts.filter(t => !t.done);
+      left += undone.reduce((a, t) => a + t.min, 0);
+      const first = undone[0] || ts[0];
+      lines.push(`<span class="cal-line${undone.length ? "" : " done"}" style="--c:${subjColor(sub)}" title="${esc(sub)}: ${esc(ts.map(taskShort).join(", "))}"><i></i><span>${esc(taskShort(first))}</span>${ts.length > 1 ? `<em>+${ts.length - 1}</em>` : ""}</span>`);
+    }
+    const first = d.getDate() === 1 || iso === isoDay(start);
+    cells += `<button class="cal-cell${iso === todayIso ? " today" : ""}${iso < todayIso ? " past" : ""}${iso === c.sel ? " sel" : ""}" data-d="${iso}">
+      <span class="dn"><b>${first ? `${d.getMonth() + 1}/${d.getDate()}` : d.getDate()}</b>${left ? `<span class="tm${left > daily * 1.3 ? " heavy" : ""}">${mins(left)}</span>` : ""}</span>
+      ${lines.join("")}</button>`;
+  }
+  // 고른 날 자세히: 과목별 할 일 (오늘이면 복습 카드도)
+  const selMap = byDay.get(c.sel) || new Map(), all = [];
+  const groups = plans.map(p => {
+    const ts = [...(selMap.get(p.subject) || [])];
+    const card = c.sel === todayIso ? cardsTask(p.subject) : null;
+    if (card) ts.push({ ...card, _subj: p.subject });
+    const isExam = p.exam === c.sel;
+    if (!ts.length && !isExam) return "";
+    all.push(...ts);
+    const review = p.reviewDays.includes(c.sel);
+    return `<div class="cal-sub" style="--c:${subjColor(p.subject)}">
+      <div class="hd"><i></i>${esc(p.subject)}${isExam ? '<span class="pv-tag rv">시험 날</span>' : review ? '<span class="pv-tag rv">시험 직전 정리</span>' : ""}
+        <span class="meta">${p.dday ? `D-${p.dday}` : "D-day"}</span><button class="btn ghost" data-subj="${esc(p.subject)}">과목 계획 보기</button></div>
+      ${ts.length ? `<div class="pv-list">${ts.map(t => taskRow(t, { subject: p.subject })).join("")}</div>` : ""}
+    </div>`;
+  }).join("");
+  const selLeft = all.filter(t => !t.done).reduce((a, t) => a + (t.min || 0), 0);
+  const notes = plans.flatMap(p => [p.notice ? `<div class="pv-note info"><b>${esc(p.subject)}</b> · ${esc(p.notice)}</div>` : "",
+    p.warn ? `<div class="pv-note warn"><b>${esc(p.subject)}</b> · ${esc(p.warn)}<button class="btn" data-subj="${esc(p.subject)}">범위 다시 정하기</button></div>` : ""]).join("");
+  $("#pvStage").innerHTML = `<div class="st-wrap">${legend}${notes}
+    <div class="cal-grid">${cells}</div>
+    <div class="cal-detail">
+      <div class="st-h">${c.sel === todayIso ? "오늘 · " : ""}${dayLabel(c.sel)}${all.length ? meta([selLeft ? `남은 시간 약 ${mins(selLeft)}` : "다 했어요", `${all.length}칸`]) : ""}</div>
+      ${groups || '<div class="blank">이 날은 계획된 할 일이 없어요.</div>'}
+    </div>
+    <p class="desc" style="color:var(--muted);font-size:12.5px;margin-top:22px">날짜를 누르면 그날 모든 과목의 할 일이 아래에 떠요. 칸 위 숫자는 그날 남은 시간이고, 하루 평균보다 1.3배 넘게 많은 날은 주황색이에요. 과목 이름을 누르면 그 과목만 보여요. 앱을 켤 때마다 못 한 칸은 뒤로, 미리 한 칸은 빼고 남은 진도를 다시 나눠요.</p>
+  </div>`;
+  bindCalendar();
+  bindTasks($("#pvStage .cal-detail"), all, null);
+}
+function bindCalendar() {
+  const st = $("#pvStage");
+  st.querySelectorAll(".cal-cell").forEach(b => b.onclick = () => {
+    pv.cal.sel = b.dataset.d; const top = st.scrollTop; renderCalendar(); st.scrollTop = top;
+  });
+  st.querySelectorAll("[data-only]").forEach(b => b.onclick = () => { pv.cal.only = pv.cal.only === b.dataset.only ? null : b.dataset.only; renderCalendar(); });
+  st.querySelectorAll("[data-make]").forEach(b => b.onclick = () => planSubject(b.dataset.make));
+  st.querySelectorAll(".cal-sub [data-subj], .pv-note [data-subj]").forEach(b => b.onclick = () => planSubject(b.dataset.subj));
+}
+
+document.addEventListener("keydown", e => {
+  if (!pv || e.isComposing || document.querySelector("dialog[open]") || e.key !== "Escape") return;
+  if (["INPUT", "SELECT"].includes(document.activeElement?.tagName)) { e.preventDefault(); return document.activeElement.blur(); }
+  e.preventDefault();
+  if (pv.mode === "subj" && pv.setup && pv.data?.plan) { pv.setup = false; return renderPlan(); }
+  if (pv.mode === "subj") return setPlanMode("cal");
+  closePlan();
+});
+
+// 처음 화면 '오늘 할 일' + 사이드바 계획표 옆 숫자 (오늘 안 한 칸)
+async function loadTodayPlans() {
+  let plans;
+  try { plans = (await (await api("/api/plans")).json()).plans; } catch { return; }
+  const left = plans.reduce((a, p) => a + p.today.filter(t => !t.done).length, 0);
+  $("#planNum").textContent = left || "";
+  const box = $("#todayPlans"), hint = $("#planHint");
+  if (!box) return;
+  // 계획이 없으면 맨 위 칸은 비우고 아래에 한 줄 안내만
+  hint.innerHTML = plans.length ? "" : '시험이 다가오면 <a id="tpMake">시험 계획표</a>를 만들어 보세요. 이 화면 맨 위에 오늘 할 일이 떠요.';
+  if (!plans.length) { box.innerHTML = ""; $("#tpMake").onclick = openPlan; return; }
+  const all = [];
+  box.innerHTML = plans.map(p => {
+    const card = cardsTask(p.subject);
+    const tasks = [...p.today.filter(t => !t.done), ...(card ? [card] : [])];
+    tasks.forEach(t => { t._subj = p.subject; all.push(t); });
+    const done = p.today.filter(t => t.done).length;
+    return `<div class="today-plan">
+      <div class="hd"><b>${esc(p.subject)}</b><span class="pv-tag">${p.dday ? `D-${p.dday}` : "D-day"}</span>
+        ${meta([p.today.length ? `오늘 ${done}/${p.today.length}칸` : "오늘은 쉬는 날", `전체 ${Math.round(p.progress.done / Math.max(p.progress.total, 1) * 100)}%`])}
+        <button class="btn ghost" data-open="${esc(p.subject)}">계획표</button></div>
+      ${p.notice ? `<div class="pv-note info">${esc(p.notice)}</div>` : ""}
+      ${tasks.length ? `<div class="pv-list">${tasks.map(t => taskRow(t, { subject: p.subject })).join("")}</div>`
+        : `<div class="blank">${p.today.length ? "오늘 할 일을 다 했어요" : "오늘은 계획된 할 일이 없어요"}</div>`}
+    </div>`;
+  }).join("");
+  box.querySelectorAll("[data-open]").forEach(b => b.onclick = () => { openPlan(); if (pv) pv.cal.only = b.dataset.open; });
+  bindTasks(box, all, null);
+}
+loadTodayPlans();
+
 /* ── 스튜디오: 정리 자료 만들기·보관 ── */
 const ST_TYPES = {
   summary: { ic: "summary", name: "시험대비 요약", desc: "강의별 핵심 개념과 꼭 외울 것, 헷갈리는 포인트, 시험 전 체크리스트" },
@@ -2291,6 +2851,7 @@ const genBusy = () => !!st?.gen && !st.gen.err;
 
 function studioShown() { return !!st && !$("#studiov").hidden; }
 function openStudio() {
+  if (pv) closePlan();
   if (rv || rl) closeReview();
   if (qz || ql) closeQuiz();
   if (hv) closeHistory();
@@ -2550,6 +3111,7 @@ async function saveChat() {
   } catch (e) { toast("대화를 기록하지 못했어요: " + e.message); }
 }
 async function openHistory() {
+  if (pv) closePlan();
   if (rv || rl) closeReview();
   if (qz || ql) closeQuiz();
   if (st) closeStudio();
@@ -2759,6 +3321,7 @@ $("#qSubj").onchange = e => loadQuizStyle(e.target.value);
 $("#qStyle").onclick = e => { const b = e.target.closest("button"); if (b && !b.disabled) setQuizStyle(b.dataset.v); };
 $("#qNote").oninput = $("#qPicks").oninput = updateQuizStyleInfo;
 function showQuizView() {
+  if (pv) closePlan();
   if (rv || rl) closeReview();
   if (st) closeStudio();
   if (hv) closeHistory();
@@ -3164,6 +3727,7 @@ function fmtDays(d) {
 }
 
 function showReviewView() {
+  if (pv) closePlan();
   if (qz || ql) closeQuiz();
   if (st) closeStudio();
   if (hv) closeHistory();

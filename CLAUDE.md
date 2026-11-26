@@ -8,6 +8,7 @@
 - `cache/목차/<과목>.md`: 과목 목차 (파일별 쪽 범위 → 제목, 🖼 = 그림·수식 있는 쪽)
 - `data/cards.json`: 복습 카드. **직접 편집 금지, `python tools/srs.py`로만**
 - `data/styles/<과목>.note.txt` / `.json`: 시험 스타일 (내 메모 → 자료 분석 순으로 따른다)
+- `data/plans/<과목>.json`: 시험 계획표. **직접 편집 금지**, 보기는 `python tools/plan.py show <과목>` (앱 계획표 화면에서 만들고 고친다)
 - `studio/<과목>/`: 스튜디오 정리 자료. 파생 자료라 **출처로 인용하지 않는다**
 
 ## 자료 성격 (파일명으로 구분)
