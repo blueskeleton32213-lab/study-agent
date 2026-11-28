@@ -315,7 +315,8 @@ body.cites-on .src.cite-src { display: block; }
 .vw-body { flex: 1; overflow: auto; padding: 18px; background: var(--bg); }
 .vw-img { display: block; width: 100%; height: auto; border-radius: 4px; box-shadow: 0 0 0 1px var(--rule), 0 4px 16px rgba(20,28,45,.08); background: #fff; cursor: zoom-in; }
 .vw-img.fitp { width: auto; max-width: 100%; max-height: var(--vw-h, 80vh); margin: 0 auto; }
-.vw-img.zoomed { max-width: none; cursor: zoom-out; }
+.vw-img.zoomed { max-width: none; cursor: grab; touch-action: none; user-select: none; }
+.vw-body.panning, .vw-body.panning .vw-img { cursor: grabbing; }
 .vw-text { font-size: calc(14px * var(--vw-font, 1)); }
 .vw-zoom { display: flex; align-items: center; margin-right: 2px; }
 .vw-zlabel { min-width: 58px; height: 30px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: 12.5px var(--sans); font-variant-numeric: tabular-nums; cursor: pointer; }
@@ -1665,8 +1666,14 @@ async function showViewerPage() {
   if (info.kind === "pdf") {
     $("#vwPage").textContent = `${vw.page} / ${info.count}쪽`;
     const img = new Image(); img.className = "vw-img"; img.alt = `${info.name} ${vw.page}쪽`;
-    img.title = "클릭해서 크게 보거나 다시 맞춰요 · Ctrl+휠로 확대·축소";
-    img.onclick = () => setVwZoom(vwZoom === "width" || vwZoom === "page" ? 2 : "width");
+    img.title = "클릭한 곳을 크게 보거나 다시 맞춰요 · Ctrl+휠로 커서 위치 확대·축소 · 확대하면 끌어서 옮겨 보기";
+    img.draggable = false;
+    img.onclick = e => {
+      if (vwDrag?.justPanned) return;
+      setVwZoom(vwZoom === "width" || vwZoom === "page" ? 2 : "width", { x: e.clientX, y: e.clientY });
+    };
+    img.onpointerdown = vwPanStart; img.onpointermove = vwPanMove;
+    img.onpointerup = img.onpointercancel = vwPanEnd;
     img.onerror = () => body.innerHTML = '<div class="vw-msg">이 쪽을 불러오지 못했어요. 원본 열기로 확인해 주세요.</div>';
     img.src = `/api/page?path=${encodeURIComponent(info.path)}&page=${vw.page}`;
     body.innerHTML = '<div class="vw-msg typing vw-loading">쪽을 그리는 중</div>'; body.append(img);
@@ -1718,19 +1725,49 @@ function applyVwZoom() {
     img.style.width = vwZoom === "page" ? "" : `${z * 100}%`;
   }
 }
-function setVwZoom(z) {
+/* at: 화면 좌표 {x, y} — 그 점 아래 있던 곳이 확대 뒤에도 그 자리에 남는다 (없으면 보이는 영역 가운데) */
+function setVwZoom(z, at) {
   if (typeof z === "number") z = Math.round(Math.min(4, Math.max(.5, z)) * 100) / 100;
   if (z === 1) z = "width";
-  const body = $("#vwBody");
-  const rx = body.scrollLeft / Math.max(1, body.scrollWidth - body.clientWidth), ry = body.scrollTop / Math.max(1, body.scrollHeight - body.clientHeight);
+  const body = $("#vwBody"), img = body.querySelector(".vw-img");
+  if (!img || !img.offsetWidth) {  // 글 구간: 스크롤 비율 유지
+    const rx = body.scrollLeft / Math.max(1, body.scrollWidth - body.clientWidth), ry = body.scrollTop / Math.max(1, body.scrollHeight - body.clientHeight);
+    vwZoom = z; store.set("vwZoom", z); applyVwZoom();
+    body.scrollLeft = rx * (body.scrollWidth - body.clientWidth); body.scrollTop = ry * (body.scrollHeight - body.clientHeight);
+    return;
+  }
+  if (!at) { const b = body.getBoundingClientRect(); at = { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }
+  const r0 = img.getBoundingClientRect();
+  const fx = Math.min(1, Math.max(0, (at.x - r0.left) / r0.width)), fy = Math.min(1, Math.max(0, (at.y - r0.top) / r0.height));
   vwZoom = z; store.set("vwZoom", z); applyVwZoom();
-  body.scrollLeft = rx * (body.scrollWidth - body.clientWidth); body.scrollTop = ry * (body.scrollHeight - body.clientHeight); // 보던 위치 유지
+  const r1 = img.getBoundingClientRect();
+  body.scrollLeft += r1.left + fx * r1.width - at.x;
+  body.scrollTop += r1.top + fy * r1.height - at.y;
 }
-function stepVwZoom(dir) {
+function stepVwZoom(dir, at) {
   let cur = typeof vwZoom === "number" ? vwZoom : 1;
   const img = $("#vwBody .vw-img");
   if (vwZoom === "page" && img) cur = img.offsetWidth / Math.max(1, $("#vwBody").clientWidth - 2 * parseFloat(getComputedStyle($("#vwBody")).paddingLeft));
-  setVwZoom(dir > 0 ? cur * 1.25 : cur / 1.25);
+  setVwZoom(dir > 0 ? cur * 1.25 : cur / 1.25, at);
+}
+/* 확대한 쪽은 끌어서 옮겨 보기 — 조금이라도 끌었으면 놓을 때 클릭(배율 전환)으로 치지 않는다 */
+let vwDrag = null;
+function vwPanStart(e) {
+  const body = $("#vwBody");
+  if (e.button !== 0 || (body.scrollWidth <= body.clientWidth && body.scrollHeight <= body.clientHeight)) return;
+  vwDrag = { x: e.clientX, y: e.clientY, sl: body.scrollLeft, st: body.scrollTop, moved: false, id: e.pointerId };
+}
+function vwPanMove(e) {
+  if (!vwDrag || e.pointerId !== vwDrag.id) return;
+  const dx = e.clientX - vwDrag.x, dy = e.clientY - vwDrag.y, body = $("#vwBody");
+  if (!vwDrag.moved && Math.hypot(dx, dy) < 4) return;
+  if (!vwDrag.moved) { vwDrag.moved = true; body.classList.add("panning"); e.target.setPointerCapture?.(e.pointerId); }
+  body.scrollLeft = vwDrag.sl - dx; body.scrollTop = vwDrag.st - dy;
+}
+function vwPanEnd() {
+  if (!vwDrag) return;
+  if (vwDrag.moved) { vwDrag.justPanned = true; setTimeout(() => { vwDrag = null; }, 0); } else vwDrag = null;
+  $("#vwBody").classList.remove("panning");
 }
 window.addEventListener("resize", () => { if (!$("#viewer").hidden) applyVwZoom(); });
 function stepViewer(d) { if (vw && vw.page + d >= 1 && vw.page + d <= vw.info.count) { vw.page += d; showViewerPage(); } }
@@ -4105,7 +4142,7 @@ $("#vwOut").onclick = () => stepVwZoom(-1);
 $("#vwZ").onclick = () => setVwZoom(vwZoom === "width" ? "page" : "width");
 $("#vwFitW").onclick = () => setVwZoom("width");
 $("#vwFitP").onclick = () => setVwZoom("page");
-$("#vwBody").addEventListener("wheel", e => { if (e.ctrlKey) { e.preventDefault(); stepVwZoom(e.deltaY < 0 ? 1 : -1); } }, { passive: false });
+$("#vwBody").addEventListener("wheel", e => { if (e.ctrlKey) { e.preventDefault(); stepVwZoom(e.deltaY < 0 ? 1 : -1, { x: e.clientX, y: e.clientY }); } }, { passive: false });
 $("#vwPrev").onclick = () => stepViewer(-1);
 $("#vwNext").onclick = () => stepViewer(1);
 $("#vwOpen").onclick = () => vw && api(`/api/open-file?path=${encodeURIComponent(vw.info.path)}`, { method: "POST" }).catch(e => toast(e.message));
